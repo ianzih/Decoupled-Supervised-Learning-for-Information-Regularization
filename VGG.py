@@ -29,16 +29,25 @@ class VGG(nn.Module):
         #     loss += self.loss(out, y)
         #     out = out.detach()
         
+        out = self.fc(out)
         if self.training:
-            loss = self.loss(out, y)
-        
-        if self.training:
-            return loss 
+            loss = self.ce(out, y)
+            return loss
         else:
             return out.detach()
         
     def _make_linear_layer(self, in_features, out_features):
             return nn.Sequential(nn.Linear(in_features, out_features, bias=True), nn.BatchNorm1d(out_features), nn.ReLU())
+        
+    def _make_layer(self, channel_size: list):
+        layers = []
+        for dim in channel_size:
+            if dim == 'M':
+                layers.append(nn.MaxPool2d(2, stride=2))
+            else:
+                layers.append(conv_layer_bn(self.in_channel, dim, nn.ReLU()))
+                self.in_channel = dim
+        return nn.Sequential(*layers)
 
 class VGG_AL_Component(ALComponent):
     def __init__(self, conv:nn.Module, flatten_size: int, hidden_size: int, out_features: int):
