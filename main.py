@@ -10,7 +10,7 @@ import time
 import argparse
 
 
-from utils import AverageMeter, accuracy, TwoCropTransform, LARS
+from utils import AverageMeter, accuracy, TwoCropTransform, LARS, GetModelSizeVision
 from ResNet import resnet18, resnet18_AL, resnet18_SCPL, resnet18_PredSim
 from VGG import VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_SCPL_Dynamic
 from vanillaCNN import CNN, CNN_AL, CNN_SCPL, CNN_PredSim
@@ -43,9 +43,9 @@ def get_arguments():
     
     # other config
     parser.add_argument('--blockwise_total', type = int, default = 4, help = 'A total of model blockwise')
-    parser.add_argument("--mlp", type = str, default="2048-2048-2048", help='Size and number of layers of the MLP expander head')
-    parser.add_argument("--merge", type = str, default="merge", help='decide whether to merge the classifier into the projector (merge, unmerge)')
-    
+    parser.add_argument("--mlp", type = str, default = "2048-2048-2048", help = 'Size and number of layers of the MLP expander head')
+    parser.add_argument("--merge", type = str, default="merge", help =' Decide whether to merge the classifier into the projector (merge, unmerge)')
+    parser.add_argument("--showmodelsize", type = bool, default = False, help = 'Whether show model size (True, False)')
     
     return parser.parse_args()
 
@@ -334,6 +334,7 @@ def main(i):
     train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type)
     model = set_model(args.model).cuda() if torch.cuda.is_available() else set_model(args.model)
     optimizer = set_optim(model= model, optimal= args.optimal)
+    GetModelSizeVision(model, train_loader, args)
     
     args.max_steps = args.epochs * len(train_loader)
     print(args)

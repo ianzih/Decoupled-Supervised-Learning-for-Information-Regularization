@@ -3,6 +3,7 @@ import torch.nn as nn
 import random
 import numpy as np
 import math
+import os
 import torch.nn.functional as F
 from torch import optim
 
@@ -381,3 +382,27 @@ class LARS(optim.Optimizer):
                 
     def exclude_bias_and_norm(p):
         return p.ndim == 1
+    
+def GetModelSizeVision(model, train_loader, args):
+    try:
+        from torchinfo import summary
+    except Exception as E:
+        print("You need to install python package - \"pip install torchinfo==1.8.0\"")
+        os._exit(0)
+    
+    if args.showmodelsize == True:
+        for step, (X, Y) in enumerate(train_loader): 
+            if args.aug_type == "strong":
+                if args.dataset == "cifar10" or args.dataset == "cifar100":
+                    X = torch.cat(X).cuda(non_blocking=True)
+                    Y = torch.cat(Y).cuda(non_blocking=True)
+                else:
+                    X = torch.cat(X).cuda(non_blocking=True)
+                    Y = torch.cat([Y, Y]).cuda(non_blocking=True)
+
+            model.train()
+            summary(model, depth = 10, input_data = [X,Y], batch_dim = args.train_bsz, verbose = 1)
+
+            model.eval()
+            summary(model, depth = 10, input_data=[X,Y], batch_dim = args.train_bsz, verbose = 1)
+            break

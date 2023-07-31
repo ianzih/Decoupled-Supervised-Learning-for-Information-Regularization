@@ -154,20 +154,20 @@ class VGG_SCPL(nn.Module):
         layer_cfg = {0:[128, 128, 128, 256, "M"], 1:[256, 512, "M"], 2:[512, 512, "M"], 3:[512, "M"]}
 
         self.layer1 = self._make_layer(layer_cfg[0])
-        # self.loss1 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 256, shape = self.shape)
-        self.loss1 =  VICRIG(c_in = 256, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
+        self.loss1 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 256, shape = self.shape)
+        # self.loss1 =  VICRIG(c_in = 256, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
         
         self.layer2 = self._make_layer(layer_cfg[1])
-        # self.loss2 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
-        self.loss2 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
+        self.loss2 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
+        # self.loss2 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
 
         self.layer3 = self._make_layer(layer_cfg[2])
-        # self.loss3 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
-        self.loss3 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
+        self.loss3 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
+        # self.loss3 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
 
         self.layer4 = self._make_layer(layer_cfg[3])
-        # self.loss4 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
-        self.loss4 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
+        self.loss4 =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = self.shape)
+        # self.loss4 =  VICRIG(c_in = 512, shape = self._shape_div_2(), mid_neurons = 2048, n_class = self.num_classes)
 
         self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
         self.ce = nn.CrossEntropyLoss()
@@ -314,6 +314,7 @@ class VGG_SCPL_Dynamic(nn.Module):
             
         if self.training:
             classifier_loss = self.ce(classifier_out , y)
+            
             
         return loss , classifier_loss, classifier_out, output
     
