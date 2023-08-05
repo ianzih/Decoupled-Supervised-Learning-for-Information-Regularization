@@ -219,6 +219,7 @@ class VGG_SCPL_Dynamic(nn.Module):
         super(VGG_SCPL_Dynamic, self).__init__()
         self.num_classes = args.n_classes
         self.merge = args.merge
+        self.blockwisetotal = args.blockwise_total
         self.shape = 32
         self.in_channels = 3
         # layer_cfg = {0:[128, 256, "M"], 1:[256, 512, "M"], 2:[512, "M"], 3:[512, "M"]}
@@ -248,32 +249,32 @@ class VGG_SCPL_Dynamic(nn.Module):
     def forward(self, x, y):
         total_loss = 0
         total_classifier_loss = 0
-        classifier_output = {'1':[], '2':[],'3':[],'4':[]}
+        classifier_output = {i: [] for i in range(1, self.blockwisetotal + 1)}
     
         # Layer1
         loss, classifier_loss, classifier_out, output = self._each_layer(x, y , self.layer1, self.loss1, self.classifier1)
-        classifier_output["1"].append(classifier_out)
+        classifier_output[1].append(classifier_out)
         if self.training: 
             total_loss += loss
             total_classifier_loss += classifier_loss
         
         # Layer2    
         loss, classifier_loss, classifier_out, output = self._each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        classifier_output["2"].append(classifier_out)
+        classifier_output[2].append(classifier_out)
         if self.training: 
             total_loss += loss
             total_classifier_loss += classifier_loss
             
         # Layer3
         loss, classifier_loss, classifier_out, output = self._each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        classifier_output["3"].append(classifier_out)
+        classifier_output[3].append(classifier_out)
         if self.training: 
             total_loss += loss
             total_classifier_loss += classifier_loss
             
         # Layer4
         loss, classifier_loss, classifier_out, output = self._each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        classifier_output["4"].append(classifier_out)
+        classifier_output[4].append(classifier_out)
         if self.training: 
             total_loss += loss
             total_classifier_loss += classifier_loss
@@ -313,7 +314,7 @@ class VGG_SCPL_Dynamic(nn.Module):
             classifier_out = classifier(output)
             
         if self.training:
-            classifier_loss = self.ce(classifier_out , y)
+            classifier_loss = self.ce(classifier_out , y) 
             
             
         return loss , classifier_loss, classifier_out, output

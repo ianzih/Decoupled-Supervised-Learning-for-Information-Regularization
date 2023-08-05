@@ -4,6 +4,7 @@ import random
 import numpy as np
 import math
 import os
+import json
 import torch.nn.functional as F
 from torch import optim
 
@@ -225,12 +226,14 @@ def Classifier(args, input_channel, final_channels):
     f = list(map(int, mlp_spec.split("-")))
     if args.merge == 'unmerge':
         layers.append(Flatten())
-        for i in range(len(f) - 3):
+        for i in range(len(f) - 2):
             layers.append(nn.Linear(f[i], f[i + 1]))
             layers.append(nn.BatchNorm1d(f[i + 1]))
             layers.append(nn.ReLU())
         layers.append(nn.Linear(f[-2], args.n_classes))
     else:
+        layers.append(nn.BatchNorm1d(final_channels))
+        layers.append(nn.ReLU())
         layers.append(nn.Linear(final_channels, args.n_classes))
     return nn.Sequential(*layers)
 
@@ -323,6 +326,17 @@ class TwoCropTransform:
             return [x, x]
         return [self.transform1(x), self.transform2(x)]
 
+# Learning rate setting
+def Adjust_Learning_Rate(optimizer, base_lr, end_lr, step, max_steps):
+    q = 0.5 * (1 + math.cos(math.pi * step / max_steps))
+    lr = base_lr * q + end_lr * (1 - q)
+    set_lr(optimizer, lr)
+    return lr
+
+def set_lr(optimizer, lr):
+    for g in optimizer.param_groups:
+        g['lr'] = lr
+
 # LARS Optimizer
 class LARS(optim.Optimizer):
     def __init__(
@@ -406,3 +420,105 @@ def GetModelSizeVision(model, train_loader, args):
             model.eval()
             summary(model, depth = 10, input_data=[X,Y], batch_dim = args.train_bsz, verbose = 1)
             break
+
+def SetGPUDevices(gpu_id):
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
+    
+    return list(map(str, gpu_id.split(",")))
+
+def get_gpu_info(gpu_id):
+    gpu_info = torch.cuda.get_device_properties(gpu_id)
+    gpu_name = gpu_info.name
+    gpu_cuda_ver = "{}.{}_{}".format(gpu_info.major, gpu_info.minor, torch.version.cuda) 
+    total_m = gpu_info.total_memory
+    reserved_m = torch.cuda.memory_reserved(gpu_id)
+    allocated_m = torch.cuda.memory_allocated(gpu_id)
+    free_m = reserved_m-allocated_m  
+    
+    gpuinfo = {"id": gpu_id, "name": gpu_name, "cuda": gpu_cuda_ver, "total": total_m,
+        "reserved": reserved_m, "allocated": allocated_m, "free": free_m}
+    
+    return gpuinfo
+
+def Calculate_GPUs_usage(gpu_ids:list()):
+    total_all_m = 0
+    reserved_all_m = 0
+    gpus_info = list()
+
+    for idx in range(len(set(gpu_ids))):
+        gpu_info = get_gpu_info(int(gpu_ids[idx]))
+        total_all_m = gpu_info['total'] + total_all_m
+        reserved_all_m = gpu_info['reserved'] + reserved_all_m
+        gpus_info.append(gpu_info)
+
+    return {"total_all_m":total_all_m, "reserved_all_m":reserved_all_m, "gpus_info": gpus_info}
+
+class ResultRecorder(object):
+    def __init__(self, args = None):
+        self.args = args
+        self.hyperparam = dict()
+        self.modelresult = dict()
+        self.epochtrainresult = dict()
+        
+        self._initjsonparam()
+    
+    def _initjsonparam(self):
+        self.times = 'Round Time' 
+        self.best_test_acc = 'Best Test Acc'
+        self.best_test_epoch = 'Best Test Epoch'
+        self.train_last_acc = 'Train Last Acc'
+        self.lr = 'Learning Rate'
+        self.epoch = 'Epoch'
+        self.train_last_acc = 'Train Last Acc'
+        self.gpus_info = 'GPU Info.'
+        self.train_classifier_acc =  'Train Classifier Acc'
+        self.train_loss = 'Train Loss'
+        self.train_time = 'Train Time'
+        self.test_last_acc = 'Test Last Acc'
+        self.test_classifier_acc =  'Test Classifier Acc'
+        self.test_time = 'Test Time'
+    
+    def addinfo(self, times, best_test_acc, best_test_epoch, gpus_info):
+        self.modelresult[times] = {
+            self.times: times,
+            self.best_test_acc: best_test_acc,
+            self.best_test_epoch: best_test_epoch,
+            self.gpus_info: gpus_info
+        }
+        
+    def epochresult(self, roundtime, epoch, lr, trainacc_L, trainacc_C, loss, traintime, testacc_L, testacc_C, testtime):
+        self.epochtrainresult[roundtime] = dict()
+        
+        self.epochtrainresult[roundtime][epoch] = {
+            self.epoch: epoch,
+            self.lr: lr,
+            self.train_last_acc: trainacc_L,
+            self.train_classifier_acc: trainacc_C,
+            self.train_loss: loss,
+            self.train_time: traintime,
+            self.test_last_acc: testacc_L,
+            self.test_classifier_acc: testacc_C,
+            self.test_time: testtime
+        }
+    
+    def _makefinalresult(self):
+        self.hyperparam = vars(self.args)
+        final_result = {
+            'Model Hyperparam' : self.hyperparam,
+            'Model Best Result Value' : self.modelresult,
+            'Round Time Result Summary' : self.epochtrainresult,
+        }
+        return final_result
+    
+    def save(self, path):     
+        import datetime
+        filename = '(' + self.args.dataset + ')_(' + self.args.model + ')_(' + str(self.args.base_lr) + \
+            ')_(' +  self.args.mlp + ')'
+        now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+        path = path + filename + '_d(' + now + ').json'
+
+        with open(path, 'w', encoding='utf-8') as json_f:
+            json_f.write(json.dumps(self._makefinalresult(), indent = 4)) 
+        
+        print("[INFO] Save results, file name: {}".format(path))
+        

@@ -10,7 +10,7 @@ import time
 import argparse
 
 
-from utils import AverageMeter, accuracy, TwoCropTransform, LARS, GetModelSizeVision
+from utils import AverageMeter, accuracy, TwoCropTransform, LARS, GetModelSizeVision, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
 from ResNet import resnet18, resnet18_AL, resnet18_SCPL, resnet18_PredSim
 from VGG import VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_SCPL_Dynamic
 from vanillaCNN import CNN, CNN_AL, CNN_SCPL, CNN_PredSim
@@ -38,28 +38,22 @@ def get_arguments():
     parser.add_argument('--max_steps', type = int, default = 2000, help = 'Learning step of training')
     parser.add_argument('--wd', type = float, default = 1e-4, help = 'Optim weight_decay')
     
-    # Loss
+    # Loss & GPU info.
     parser.add_argument("--localloss", type = str, default = "VICRIG", help = 'Defined local loss in each layer')
+    parser.add_argument('--gpus', type=str, default="0", help=' ID of the GPU device. If you want to use multiple GPUs, you can separate their IDs with commas, \
+         e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
     # other config
     parser.add_argument('--blockwise_total', type = int, default = 4, help = 'A total of model blockwise')
     parser.add_argument("--mlp", type = str, default = "2048-2048-2048", help = 'Size and number of layers of the MLP expander head')
     parser.add_argument("--merge", type = str, default="merge", help =' Decide whether to merge the classifier into the projector (merge, unmerge)')
     parser.add_argument("--showmodelsize", type = bool, default = False, help = 'Whether show model size (True, False)')
+    parser.add_argument("--jsonfilepath", type = str, default="./modelresult/", help ='json file path for model result info.')
+    parser.add_argument('--train_time', type = int, default = 1, help = 'Round Times of training step')
     
     return parser.parse_args()
 
 args =  get_arguments()
-
-def adjust_learning_rate(optimizer, base_lr, end_lr, step, max_steps):
-    q = 0.5 * (1 + math.cos(math.pi * step / max_steps))
-    lr = base_lr * q + end_lr * (1 - q)
-    set_lr(optimizer, lr)
-    return lr
-
-def set_lr(optimizer, lr):
-    for g in optimizer.param_groups:
-        g['lr'] = lr
 
 def set_optim(model, optimal='LARS'):
     if optimal == 'LARS':
@@ -274,7 +268,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         
     sys.stdout.flush()
 
-    return losses.avg, accs.avg, global_steps
+    return losses.avg, accs.avg, global_steps, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(train_loader)
 
 
 
@@ -324,30 +318,38 @@ def test(test_loader, model, epoch):
     print("================================================")
     sys.stdout.flush()
 
-    return accs.avg
+    return accs.avg, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(test_loader)
 
 
-def main(i):
+def main(time, result_recorder):
     best_acc = 0
+    best_epoch = 0
     global_steps = 0
     
     train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type)
     model = set_model(args.model).cuda() if torch.cuda.is_available() else set_model(args.model)
     optimizer = set_optim(model= model, optimal= args.optimal)
     GetModelSizeVision(model, train_loader, args)
+    GPU_list = SetGPUDevices(args.gpus)
     
     args.max_steps = args.epochs * len(train_loader)
     print(args)
     for epoch in range(1, args.epochs + 1):
-        lr = adjust_learning_rate(optimizer, args.base_lr, args.end_lr, global_steps, args.max_steps)
+        lr = Adjust_Learning_Rate(optimizer, args.base_lr, args.end_lr, global_steps, args.max_steps)
         
         print("lr: {:.6f}".format(lr))
-        loss, train_acc, global_steps = train(train_loader, model, optimizer, global_steps, epoch, args.aug_type, args.dataset)
-        test_acc = test(test_loader, model, epoch)
+        loss, train_acc, global_steps, train_classifier_acc, train_time = train(train_loader, model, optimizer, global_steps, epoch, args.aug_type, args.dataset)
+        test_acc,  test_classifier_acc, test_time= test(test_loader, model, epoch)
 
         if test_acc > best_acc:
             best_acc = test_acc
+            best_epoch = epoch
+        result_recorder.epochresult(time, epoch, lr, train_acc, train_classifier_acc, loss, train_time, test_acc, test_classifier_acc, test_time)
         
+    # Save Json Info.
+    result_recorder.addinfo(time, best_acc, best_epoch, Calculate_GPUs_usage(GPU_list))   
+        
+    # Save Checkpoints    
     state = {
         "configs": args,
         "model": model.state_dict(),
@@ -356,14 +358,17 @@ def main(i):
     }
     save_files = os.path.join("./save_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
-
+    
     del state
     print("Best accuracy: {:.2f}".format(best_acc))
 
 if __name__ == '__main__':
-    n_trials = 1
-    for i in range(n_trials):
-        main(i)
+    result_recorder = ResultRecorder(args)
+    for i in range(args.train_time):
+        main(i, result_recorder)
+        
+    result_recorder.save(args.jsonfilepath)
+    
 
 
 
