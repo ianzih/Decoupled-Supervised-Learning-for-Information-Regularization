@@ -487,7 +487,7 @@ class ResultRecorder(object):
         }
         
     def epochresult(self, roundtime, epoch, lr, trainacc_L, trainacc_C, loss, traintime, testacc_L, testacc_C, testtime):
-        self.epochtrainresult[roundtime] = dict()
+        self.epochtrainresult.setdefault(roundtime, {})
         
         self.epochtrainresult[roundtime][epoch] = {
             self.epoch: epoch,
@@ -512,6 +512,9 @@ class ResultRecorder(object):
     
     def save(self, path):     
         import datetime
+        if not os.path.exists(path):
+            os.makedirs(path)
+        
         filename = '(' + self.args.dataset + ')_(' + self.args.model + ')_(' + str(self.args.base_lr) + \
             ')_(' +  self.args.mlp + ')'
         now = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
