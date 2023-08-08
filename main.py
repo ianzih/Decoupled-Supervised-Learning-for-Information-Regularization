@@ -348,14 +348,10 @@ def main(time, result_recorder):
         
     # Save Json Info.
     result_recorder.addinfo(time, best_acc, best_epoch, Calculate_GPUs_usage(GPU_list))   
+    result_recorder.save(args.jsonfilepath)
         
     # Save Checkpoints    
-    state = {
-        "configs": args,
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
-        "epoch": epoch,
-    }
+    state = { "configs": args, "model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
     save_files = os.path.join("./save_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
     
@@ -367,7 +363,7 @@ if __name__ == '__main__':
     for i in range(args.train_time):
         main(i, result_recorder)
         
-    result_recorder.save(args.jsonfilepath)
+    
     
 
 
