@@ -8,6 +8,7 @@ import math
 import sys
 import time
 import argparse
+import numpy as np
 
 
 from utils import AverageMeter, accuracy, TwoCropTransform, LARS, GetModelSizeVision, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
@@ -245,8 +246,8 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
                     classifier_acc[num].update(acc.item(), bsz)
             else:
                 output = model(X, Y)
-        acc = accuracy(output, Y)
-        accs.update(acc.item(), bsz)
+                acc = accuracy(output, Y)
+                accs.update(acc.item(), bsz)
 
         batch_time.update(time.time()-base)
         base = time.time()
@@ -257,18 +258,19 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
             "loss {3:.3f}\t"
-            "acc {4:.3f}\t"
-            "classifier acc {5}\t".format(epoch, (batch_time.avg)*len(train_loader), (data_time.avg)*len(train_loader), losses.avg, accs.avg, [format(classifier_acc[num].avg, ".3f") for num , _ in enumerate(classifier_acc)]))
+            "Max acc {4:.3f}\t"
+            "classifier acc {5}\t".format(epoch, (batch_time.avg)*len(train_loader), (data_time.avg)*len(train_loader), 
+                                          losses.avg, max(classifier_acc, key=lambda x: x.avg).avg, [format(classifier_acc[num].avg, ".3f") for num , _ in enumerate(classifier_acc)]))
+        sys.stdout.flush()
+        return losses.avg, max(classifier_acc, key=lambda x: x.avg).avg, global_steps, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(train_loader)
     else:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
             "loss {3:.3f}\t"
             "acc {4:.3f}\t".format(epoch, (batch_time.avg)*len(train_loader), (data_time.avg)*len(train_loader), losses.avg, accs.avg))
-        
-    sys.stdout.flush()
-
-    return losses.avg, accs.avg, global_steps, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(train_loader)
+        sys.stdout.flush()
+        return losses.avg, accs.avg, global_steps, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(train_loader)
 
 
 
@@ -296,9 +298,8 @@ def test(test_loader, model, epoch):
                     classifier_acc[num].update(acc.item(), bsz)
             else:
                 output = model(X, Y)
-                
-            acc = accuracy(output, Y)
-            accs.update(acc.item(), bsz)
+                acc = accuracy(output, Y)
+                accs.update(acc.item(), bsz) 
 
             batch_time.update(time.time()-base)
             base = time.time()
@@ -308,17 +309,17 @@ def test(test_loader, model, epoch):
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
-            "classifier acc {3}\t".format(epoch, batch_time.avg*len(test_loader), accs.avg, [format(classifier_acc[num].avg, ".3f") for num , _ in enumerate(classifier_acc)]))
+            "classifier acc {3}\t".format(epoch, batch_time.avg*len(test_loader), max(classifier_acc, key=lambda x: x.avg).avg, [format(classifier_acc[num].avg, ".3f") for num , _ in enumerate(classifier_acc)]))
+        print("================================================")
+        sys.stdout.flush()
+        return max(classifier_acc, key=lambda x: x.avg).avg, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(test_loader)
     else:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t".format(epoch, batch_time.avg*len(test_loader), accs.avg))
-        
-    
-    print("================================================")
-    sys.stdout.flush()
-
-    return accs.avg, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(test_loader)
+        print("================================================")
+        sys.stdout.flush()
+        return accs.avg, [classifier_avg.avg for classifier_avg in classifier_acc], batch_time.avg*len(test_loader)  
 
 
 def main(time, result_recorder):
