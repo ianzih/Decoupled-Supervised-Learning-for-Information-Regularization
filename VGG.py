@@ -242,7 +242,6 @@ class VGG_SCPL_Dynamic(nn.Module):
         self.loss4 =  Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args)
         self.classifier4 = Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args)
         
-        self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2800), nn.BatchNorm1d(2800), nn.ReLU(), nn.Linear(2800, self.num_classes))
         self.ce = nn.CrossEntropyLoss()
 
         
@@ -304,7 +303,7 @@ class VGG_SCPL_Dynamic(nn.Module):
         loss , projector_out= localloss(output, y)
         if self.training:
             output = output.detach()
-            projector_out = projector_out.detach()
+            # projector_out = projector_out.detach()
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)

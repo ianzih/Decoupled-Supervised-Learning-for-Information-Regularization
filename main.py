@@ -196,8 +196,6 @@ def set_model(name):
     return model
 
 def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset):
-    
-
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -324,6 +322,7 @@ def test(test_loader, model, epoch):
 
 def main(time, result_recorder):
     best_acc = 0
+    best_acc_layer = 0 
     best_epoch = 0
     global_steps = 0
     
@@ -345,10 +344,11 @@ def main(time, result_recorder):
         if test_acc > best_acc:
             best_acc = test_acc
             best_epoch = epoch
+            best_acc_layer = np.argmax(test_classifier_acc)
         result_recorder.epochresult(time, epoch, lr, train_acc, train_classifier_acc, loss, train_time, test_acc, test_classifier_acc, test_time)
         
     # Save Json Info.
-    result_recorder.addinfo(time, best_acc, best_epoch, Calculate_GPUs_usage(GPU_list))   
+    result_recorder.addinfo(time, best_acc, best_epoch, Calculate_GPUs_usage(GPU_list), str(best_acc_layer))   
     result_recorder.save(args.jsonfilepath)
         
     # Save Checkpoints    

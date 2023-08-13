@@ -417,8 +417,6 @@ def GetModelSizeVision(model, train_loader, args):
             model.train()
             summary(model, depth = 10, input_data = [X,Y], batch_dim = args.train_bsz, verbose = 1)
 
-            model.eval()
-            summary(model, depth = 10, input_data=[X,Y], batch_dim = args.train_bsz, verbose = 1)
             break
 
 def SetGPUDevices(gpu_id):
@@ -477,11 +475,13 @@ class ResultRecorder(object):
         self.test_last_acc = 'Test Last Acc'
         self.test_classifier_acc =  'Test Classifier Acc'
         self.test_time = 'Test Time'
+        self.best_acc_layer = "Best_ACC_Layer"
     
-    def addinfo(self, times, best_test_acc, best_test_epoch, gpus_info):
+    def addinfo(self, times, best_test_acc, best_test_epoch, gpus_info, best_acc_layer):
         self.modelresult[times] = {
             self.times: times,
             self.best_test_acc: best_test_acc,
+            self.best_acc_layer: best_acc_layer,
             self.best_test_epoch: best_test_epoch,
             self.gpus_info: gpus_info
         }
