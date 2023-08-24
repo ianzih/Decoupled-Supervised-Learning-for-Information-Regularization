@@ -211,9 +211,9 @@ class VGG_SCPL(VGG_block):
         return output
         
 
-class VGG_SCPL_Dynamic(VGG_block):
+class VGG_Research(VGG_block):
     def __init__(self, args):
-        super(VGG_SCPL_Dynamic, self).__init__(args)
+        super(VGG_Research, self).__init__(args)
         self.num_classes = args.n_classes
         self.merge = args.merge
         self.blockwisetotal = args.blockwise_total
@@ -286,18 +286,25 @@ class VGG_SCPL_Dynamic(VGG_block):
              
         return output ,  classifier_output
     
-    def _training_each_layer(self, x, y , layer, localloss, classifier):
+    def _training_each_layer(self, x, y , layer, localloss, classifier, freeze = False):
         classifier_loss = 0
         output = layer(x)
+        if freeze:
+            output = output.detach()
         loss , projector_out= localloss(output, y)
-
-        output = output.detach()
+         
         # projector_out = projector_out.detach()
+        if freeze:
+            projector_out = projector_out.detach()
+        else:
+            output = output.detach()
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)
         elif self.merge == 'unmerge':
             classifier_out = classifier(output) 
+        if freeze:
+            classifier_out = classifier_out.detach()
         classifier_loss = self.ce(classifier_out , y) * 0.001
             
         return loss , classifier_loss , output
@@ -355,3 +362,45 @@ class VGG_PredSim(VGG_block):
             y = self.fc(x)
 
             return y
+        
+        
+class VGG_Research_Dynamic(VGG_Research):
+    def __init__(self, args):
+        super(VGG_Research_Dynamic, self).__init__(args)
+        self.dynamic_trigger_epoch = self.split_trigger_epoch(args.trigger_epoch)
+        self.args = args
+
+    def train_step(self, x, y):
+        total_loss = 0
+        total_classifier_loss = 0
+
+        # Layer1
+        loss, classifier_loss, output = self._training_each_layer(x, y , self.layer1, self.loss1, self.classifier1)
+        total_loss += loss
+        total_classifier_loss += classifier_loss
+        
+        # Layer2    
+        if self.args.epoch_now >= int(self.dynamic_trigger_epoch[1]) and self.args.epoch_now <= int(self.dynamic_trigger_epoch[2]):
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer2, self.loss2, self.classifier2, freeze=True)
+        elif int(self.dynamic_trigger_epoch[0]) <= self.args.epoch_now and len(self.dynamic_trigger_epoch) >= 1: 
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
+            total_loss += loss
+            total_classifier_loss += classifier_loss
+            
+            
+        # Layer3
+        if int(self.dynamic_trigger_epoch[1]) <= self.args.epoch_now and len(self.dynamic_trigger_epoch) >= 2: 
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
+            total_loss += loss
+            total_classifier_loss += classifier_loss
+            
+        # Layer4
+        if int(self.dynamic_trigger_epoch[2]) <= self.args.epoch_now and len(self.dynamic_trigger_epoch) >= 3: 
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
+            total_loss += loss
+            total_classifier_loss += classifier_loss
+             
+        return (total_loss + total_classifier_loss)
+        
+    def split_trigger_epoch(self, trigger_epoch):
+        return list(map(str, trigger_epoch.split(",")))

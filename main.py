@@ -12,17 +12,17 @@ import numpy as np
 
 
 from utils import AverageMeter, accuracy, TwoCropTransform, LARS, GetModelSizeVision, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
-from ResNet import resnet18, resnet18_AL, resnet18_SCPL, resnet18_PredSim
-from VGG import VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_SCPL_Dynamic
-from vanillaCNN import CNN, CNN_AL, CNN_SCPL, CNN_PredSim
+from ResNet import *
+from VGG import *
+from vanillaCNN import *
 
 
 def get_arguments():
     parser = argparse.ArgumentParser(description="Vision argu", add_help=False)
 
     # Model 
-    parser.add_argument("--model", type = str, default = "VGG_SCPL_Dynamic", help = 'Model Name [CNN, CNN_AL, CNN_SCPL, CNN_PredSim, \
-        VGG, VGG_AL, VGG_SCPL, VGG_PredSim, resnet, resnet_AL, resnet_SCPL, resnet_PredSim, VGG_SCPL_Dynamic]')
+    parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [CNN, CNN_AL, CNN_SCPL, CNN_PredSim, \
+        VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_Research, resnet, resnet_AL, resnet_SCPL, resnet_PredSim, VGG_Research_Dynamic]')
     
     # Dataset 
     parser.add_argument("--dataset", type = str, default = "cifar100", help = 'Dataset (cifar10, cifar100, tinyImageNet)')
@@ -51,6 +51,8 @@ def get_arguments():
     parser.add_argument("--showmodelsize", type = bool, default = False, help = 'Whether show model size (True, False)')
     parser.add_argument("--jsonfilepath", type = str, default="./modelresult/", help ='json file path for model result info.')
     parser.add_argument('--train_time', type = int, default = 1, help = 'Round Times of training step')
+    parser.add_argument('--trigger_epoch', type=str, default="20,40", help='This augment is only use in dynamic model. e.g., layer = 4 \"20,40,60\"')
+    parser.add_argument('--epoch_now', type = int, default = 1, help = 'Number of epoch now')
     
     return parser.parse_args()
 
@@ -170,10 +172,12 @@ def set_model(name):
         model = VGG_AL(args)
     elif name == "VGG_SCPL":
         model = VGG_SCPL(args)
-    elif name == "VGG_SCPL_Dynamic":
-        model = VGG_SCPL_Dynamic(args)
+    elif name == "VGG_Research":
+        model = VGG_Research(args)
     elif name == "VGG_PredSim":
         model = VGG_PredSim(args)
+    elif name == "VGG_Research_Dynamic":
+        model = VGG_Research_Dynamic(args)
     elif name == "resnet":
         model = resnet18(args)
     elif name == "resnet_AL":
@@ -222,7 +226,6 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
 
         global_steps += 1
 
-        
         loss = model(X, Y)
 
         if type(loss) == dict:
@@ -236,7 +239,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         
         model.eval()
         with torch.no_grad():
-            if args.model == "VGG_SCPL_Dynamic":
+            if args.model in ["VGG_Research", "VGG_Research_Dynamic"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -251,7 +254,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         base = time.time()
     
     # print info
-    if args.model == "VGG_SCPL_Dynamic":
+    if args.model in ["VGG_Research", "VGG_Research_Dynamic"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -288,7 +291,7 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model == "VGG_SCPL_Dynamic":
+            if args.model in ["VGG_Research", "VGG_Research_Dynamic"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -303,7 +306,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model == "VGG_SCPL_Dynamic":
+    if args.model in ["VGG_Research", "VGG_Research_Dynamic"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
@@ -326,17 +329,17 @@ def main(time, result_recorder):
     best_epoch = 0
     global_steps = 0
     
+    GPU_list = SetGPUDevices(args.gpus)
     train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type)
     model = set_model(args.model).cuda() if torch.cuda.is_available() else set_model(args.model)
     optimizer = set_optim(model= model, optimal= args.optimal)
     GetModelSizeVision(model, train_loader, args)
-    GPU_list = SetGPUDevices(args.gpus)
     
     args.max_steps = args.epochs * len(train_loader)
     print(args)
     for epoch in range(1, args.epochs + 1):
         lr = Adjust_Learning_Rate(optimizer, args.base_lr, args.end_lr, global_steps, args.max_steps)
-        
+        args.epoch_now = epoch
         print("lr: {:.6f}".format(lr))
         loss, train_acc, global_steps, train_classifier_acc, train_time = train(train_loader, model, optimizer, global_steps, epoch, args.aug_type, args.dataset)
         test_acc,  test_classifier_acc, test_time= test(test_loader, model, epoch)
