@@ -196,17 +196,19 @@ class Layer_Classifier(nn.Module):
         
         
 # for convolutional neural networks
-def conv_layer_bn(in_channels: int, out_channels: int, activation: nn.Module, stride: int=1, bias: bool=False) -> nn.Module:
-    conv = nn.Conv2d(in_channels, out_channels, kernel_size = 3, stride = stride, bias = bias, padding = 1)
+def conv_layer_bn(in_channels: int, out_channels: int, activation: nn.Module, stride: int=1, bias: bool=False, padding: int=1, kernel_size: int=3) -> nn.Module:
+    conv = nn.Conv2d(in_channels, out_channels, kernel_size = kernel_size, stride = stride, bias = bias, padding = padding)
     bn = nn.BatchNorm2d(out_channels)
     if activation == None:
         return nn.Sequential(conv, bn)
     return nn.Sequential(conv, bn, activation)
 
-def conv_1x1_bn(in_channels: int, out_channels: int) -> nn.Module:
-    conv = nn.Conv2d(in_channels, out_channels, kernel_size = 1, stride = 1, bias = False)
+def conv_1x1_bn(in_channels: int, out_channels: int, activation: nn.Module = None, stride: int=1, bias: bool=False) -> nn.Module:
+    conv = nn.Conv2d(in_channels, out_channels, kernel_size = 1, stride = stride, bias = bias)
     bn = nn.BatchNorm2d(out_channels)
-    return nn.Sequential(conv, bn)
+    if activation == None:
+        return nn.Sequential(conv, bn)
+    return nn.Sequential(conv, bn, activation)
 
 def Projector(args, input_channel):
     mlp_spec = f"{input_channel}-{args.mlp}"

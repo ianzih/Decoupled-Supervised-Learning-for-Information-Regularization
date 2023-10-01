@@ -34,8 +34,8 @@ def get_arguments():
     parser.add_argument('--epochs', type = int, default = 400, help = 'Number of training epochs')
     parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
-    parser.add_argument('--base_lr', type = float, default = 0.4, help = 'Initial learning rate')
-    parser.add_argument('--end_lr', type = float, default = 0.004, help = 'Learning rate at the end of training')
+    parser.add_argument('--base_lr', type = float, default = 0.2, help = 'Initial learning rate')
+    parser.add_argument('--end_lr', type = float, default = 0.002, help = 'Learning rate at the end of training')
     parser.add_argument('--max_steps', type = int, default = 2000, help = 'Learning step of training')
     parser.add_argument('--wd', type = float, default = 1e-4, help = 'Optim weight_decay')
     
@@ -178,8 +178,10 @@ def set_model(name):
         model = VGG_PredSim(args)
     elif name == "VGG_Research_Dynamic":
         model = VGG_Research_Dynamic(args)
-    elif name == "resnet":
-        model = resnet18(args)
+    elif name == "resnet18":
+        model = resnet(args, BasicBlock, [2, 2, 2, 2])
+    elif name == "resnet34":
+        model = resnet(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet_AL":
         model = resnet18_AL(args)
     elif name == "resnet_SCPL":

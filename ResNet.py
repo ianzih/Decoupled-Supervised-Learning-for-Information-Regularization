@@ -1,71 +1,141 @@
 import torch
 import torch.nn as nn
-from utils import conv_layer_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss
+from utils import conv_layer_bn, conv_1x1_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss
 
 
 
-""" 修改自: https://github.com/batuhan3526/ResNet50_on_Cifar_100_Without_Transfer_Learning """
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, in_channels, out_channels, stride=1):
+    def __init__(self, in_channels, out_channels, stride = 1, shortcut = None):
         super().__init__()
-        self.conv1 = conv_layer_bn(in_channels, out_channels, nn.LeakyReLU(inplace=True), stride, False)
+        self.conv1 = conv_layer_bn(in_channels, out_channels, nn.ReLU(inplace=True), stride, False)
         self.conv2 = conv_layer_bn(out_channels, out_channels, None, 1, False)
-        self.relu = nn.LeakyReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=True)
 
         self.shortcut = nn.Sequential()
 
         # the shortcut output dimension is not the same with residual function
-        if stride != 1:
-            self.shortcut = conv_layer_bn(in_channels, out_channels, None, stride, False)
+        self.shortcut = shortcut
 
     def forward(self, x):
+        identity = x
+        
         out = self.conv1(x)
         out = self.conv2(out)
-        out = self.relu(out + self.shortcut(x))
+        
+        if self.shortcut is not None:
+            identity = self.shortcut(x)
+        out = self.relu(out + identity)
+        return out
+    
+class Bottleneck(nn.Module):
+    expansion = 4
+
+    def __init__(self, in_channels, out_channels, stride = 1, shortcut = None):
+        super().__init__()
+        self.conv1 = conv_1x1_bn(in_channels, out_channels, nn.ReLU(inplace=True), 1, False)
+        self.conv2 = conv_layer_bn(out_channels, out_channels, nn.ReLU(inplace=True), stride, False)
+        self.conv3 = conv_1x1_bn(out_channels, out_channels, None, 1, False)
+        self.relu = nn.ReLU(inplace=True)
+
+        # the shortcut output dimension is not the same with residual function
+        self.shortcut = shortcut
+
+    def forward(self, x):
+        identity = x
+        
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.conv3(out)
+        
+        if self.shortcut is not None:
+            identity = self.shortcut(x)
+        out = self.relu(out + identity)
         return out
 
-
-class resnet18(nn.Module):
-
+class Resnet_block(nn.Module):
     def __init__(self, args):
-        super().__init__()
-
-        self.conv1 = conv_layer_bn(3, 64, nn.LeakyReLU(inplace=True), 1, False)
-
-        self.conv2_x = self._make_layer(64, 64, [1, 1])
-        self.conv3_x = self._make_layer(64, 128, [2, 1])
-        self.conv4_x = self._make_layer(128, 256, [2, 1])
-        self.conv5_x = self._make_layer(256, 512, [2, 1])
-        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512, args.n_classes)
-
-        self.ce = nn.CrossEntropyLoss()
-
-
-    def _make_layer(self, in_channels, out_channels, strides):
-        layers = []
-        cur_channels = in_channels
-        for stride in strides:
-            layers.append(BasicBlock(cur_channels, out_channels, stride))
-            cur_channels = out_channels
-        return nn.Sequential(*layers)
-
-    def forward(self, x, y=None):
-        output = self.conv1(x)
-        output = self.conv2_x(output)
-        output = self.conv3_x(output)
-        output = self.conv4_x(output)
-        output = self.conv5_x(output)
-        output = self.avg_pool(output)
-        output = output.view(output.size(0), -1)
-        output = self.fc(output)
-        if self.training:
-            return self.ce(output, y)
-        else:
-            return output
+        super(Resnet_block, self).__init__()
+        self.args = args
+        self.num_channel = 3
+        self.layershape = 64
+        self.shape = 64
         
+    def _make_layer(self, block, out_channels, stride = 1, blocks = None):
+        shortcut = None
+        if stride != 1 or self.layershape != out_channels * block.expansion:
+            shortcut = nn.Sequential(
+                conv_1x1_bn(self.layershape, out_channels * block.expansion, stride = stride)
+                )
+        
+        layers = []
+        layers.append(block(self.layershape, out_channels, stride, shortcut))
+        
+        self.layershape = out_channels * block.expansion
+        for _ in range(1, blocks):
+            layers.append(block(self.layershape, out_channels))
+            
+        return nn.Sequential(*layers)
+    
+    def _shape_mul_2(self):
+        self.shape *= 2
+        return self.shape
+    
+    def forward(self, x, y):
+        if self.training:
+            return self.train_step(x, y)
+        else:
+            return self.inference(x, y)
+        
+class resnet(Resnet_block):
+    def __init__(self, args, block, layers):
+        super(resnet, self).__init__(args)
+        self.num_class = args.n_classes
+        self.block = block
+        self.layers = layers
+        self.ce = nn.CrossEntropyLoss()
+        
+        self.conv1 = conv_layer_bn(self.num_channel, self.shape, nn.ReLU(inplace=True), stride = 1, kernel_size=3)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block = self.block, out_channels = self.shape, blocks = self.layers[0])
+        self.layer2 = self._make_layer(block = self.block, out_channels = self._shape_mul_2(), stride = 2, blocks = self.layers[1])
+        self.layer3 = self._make_layer(block = self.block, out_channels = self._shape_mul_2(), stride = 2, blocks = self.layers[2])
+        self.layer4 = self._make_layer(block = self.block, out_channels = self._shape_mul_2(), stride = 2, blocks = self.layers[3])
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(self.shape, self.num_class)
+        
+    def train_step(self, x , y):
+        output = self.conv1(x)
+        # output = self.maxpool(output)
+        
+        output = self.layer1(output)
+        output = self.layer2(output)
+        output = self.layer3(output)
+        output = self.layer4(output)
+        
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
+        
+        output = self.fc(output)
+        return self.ce(output, y)
+    
+    def inference(self, x , y):
+        output = self.conv1(x)
+        # output = self.maxpool(output)
+        
+        output = self.layer1(output)
+        output = self.layer2(output)
+        output = self.layer3(output)
+        output = self.layer4(output)
+        
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
+        
+        output = self.fc(output)
+        return output
+        
+      
 class ResNet_AL_Component(ALComponent):
     def __init__(self, conv: nn.Module, flatten_size: int = 1024, hidden_size: int = 500, out_features: int = 10):
         g_function = nn.Sigmoid() 
@@ -80,6 +150,7 @@ class ResNet_AL_Component(ALComponent):
         cb = nn.MSELoss()
         ca = nn.MSELoss()
         super(ResNet_AL_Component, self).__init__(f, g, b, inv, cf, cb, ca)
+         
          
 class resnet18_AL(nn.Module):
     def __init__(self, args):
@@ -156,6 +227,7 @@ class resnet18_AL(nn.Module):
             cur_channels = out_channels
 
         return nn.Sequential(*layers)
+    
     
 class resnet18_SCPL(nn.Module):
 
