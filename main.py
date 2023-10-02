@@ -184,8 +184,10 @@ def set_model(name):
         model = resnet(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet_AL":
         model = resnet18_AL(args)
-    elif name == "resnet_SCPL":
-        model = resnet18_SCPL(args)
+    elif name == "resnet18_SCPL":
+        model = resnet_SCPL(args, BasicBlock, [2, 2, 2, 2])
+    elif name == "resnet34_SCPL":
+        model = resnet_SCPL(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet_PredSim":
         model = resnet18_PredSim(args)
     elif name == "CNN":
