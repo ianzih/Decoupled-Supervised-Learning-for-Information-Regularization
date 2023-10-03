@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from utils import conv_layer_bn, conv_1x1_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss
+from utils import conv_layer_bn, conv_1x1_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss, Layer_Classifier, Set_Local_Loss
 
 
 
@@ -252,8 +252,8 @@ class resnet_SCPL(Resnet_block):
         self.loss3 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self._shape_div_2())
         self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
         self.loss4 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self._shape_div_2())
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Sequential(nn.Linear(self.dim, 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
 
         
     def train_step(self, x , y):
@@ -278,8 +278,8 @@ class resnet_SCPL(Resnet_block):
         loss += self.loss4(output, y)
         output = output.detach()
         
-        output = self.avgpool(output)
-        output = output.view(output.size(0), -1)
+        # output = self.avgpool(output)
+        # output = output.view(output.size(0), -1)
         output = self.fc(output)
         loss += self.ce(output, y)
         return loss
@@ -293,12 +293,132 @@ class resnet_SCPL(Resnet_block):
         output = self.layer3(output)
         output = self.layer4(output)
         
-        output = self.avgpool(output)
-        output = output.view(output.size(0), -1)
+        # output = self.avgpool(output)
+        # output = output.view(output.size(0), -1)
         output = self.fc(output)
         return output
 
+class resnet_Research(Resnet_block):
+    def __init__(self, args, block, layers):
+        super(resnet_Research, self).__init__(args)
+        self.num_classes = args.n_classes
+        self.block = block
+        self.layers = layers
+        self.merge = args.merge
+        self.blockwisetotal = args.blockwise_total
+        self.ce = nn.CrossEntropyLoss()
         
+        self.conv1 = conv_layer_bn(self.num_channel, self.dim, nn.ReLU(inplace=True), stride = 1, kernel_size=3)
+        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block = self.block, out_channels = self.dim, blocks = self.layers[0])
+        self.loss1 = Set_Local_Loss(input_channel = self.dim, shape = self.shape,  args = args)
+        self.classifier1 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
+        
+        self.layer2 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[1])
+        self.loss2 = Set_Local_Loss(input_channel = self.dim, shape = self._shape_div_2(),  args = args)
+        self.classifier2 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
+        
+        self.layer3 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[2])
+        self.loss3 = Set_Local_Loss(input_channel = self.dim, shape = self._shape_div_2(),  args = args)
+        self.classifier3 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
+        
+        self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
+        self.loss4 = Set_Local_Loss(input_channel = self.dim, shape = self._shape_div_2(),  args = args)
+        self.classifier4 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        
+    def train_step(self, x, y):
+        total_loss = 0
+        total_classifier_loss = 0
+    
+        # Layer1
+        output = self.conv1(x)
+        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer1, self.loss1, self.classifier1)
+        total_loss += loss
+        total_classifier_loss += classifier_loss
+        
+        # Layer2    
+        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
+        total_loss += loss
+        total_classifier_loss += classifier_loss
+            
+        # Layer3
+        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
+        total_loss += loss
+        total_classifier_loss += classifier_loss
+            
+        # Layer4
+        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
+        total_loss += loss
+        total_classifier_loss += classifier_loss
+             
+        return (total_loss + total_classifier_loss) 
+    
+    def inference(self, x, y):
+        classifier_output = {i: [] for i in range(1, self.blockwisetotal + 1)}
+    
+        # Layer1
+        output = self.conv1(x)
+        classifier_out, output = self._inference_each_layer(output, y , self.layer1, self.loss1, self.classifier1)
+        classifier_output[1].append(classifier_out)
+        
+        # Layer2    
+        classifier_out, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
+        classifier_output[2].append(classifier_out)
+            
+        # Layer3
+        classifier_out, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
+        classifier_output[3].append(classifier_out)
+            
+        # Layer4
+        classifier_out, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
+        classifier_output[4].append(classifier_out)
+             
+        return output ,  classifier_output
+
+    def _training_each_layer(self, x, y , layer, localloss, classifier, freeze = False):
+        classifier_loss = 0
+        output = layer(x)
+        if freeze:
+            output = output.detach()
+        loss , projector_out= localloss(output, y)
+         
+        # projector_out = projector_out.detach()
+        if freeze:
+            projector_out = projector_out.detach()
+        else:
+            output = output.detach()
+            
+        if self.merge == 'merge':
+            # projector_out = self.avgpool(projector_out)
+            # projector_out = projector_out.view(projector_out.size(0), -1)
+            classifier_out = classifier(projector_out)
+        elif self.merge == 'unmerge':
+            # output = self.avgpool(output)
+            # output = output.view(output.size(0), -1)
+            classifier_out = classifier(output) 
+        if freeze:
+            classifier_out = classifier_out.detach()
+        classifier_loss = self.ce(classifier_out , y) * 0.001
+            
+        return loss , classifier_loss , output    
+    
+    def _inference_each_layer(self, x, y , layer, localloss, classifier):
+        output = layer(x)
+        loss , projector_out= localloss(output, y)
+            
+        if self.merge == 'merge':
+            # projector_out = self.avgpool(projector_out)
+            # projector_out = projector_out.view(projector_out.size(0), -1)
+            classifier_out = classifier(projector_out)
+        elif self.merge == 'unmerge':
+            # output = self.avgpool(output)
+            # output = output.view(output.size(0), -1)
+            classifier_out = classifier(output)
+                  
+        return classifier_out, output
+    
 class resnet18_PredSim(nn.Module):
 
     def __init__(self, args):
