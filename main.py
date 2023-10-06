@@ -182,6 +182,8 @@ def set_model(name):
         model = resnet(args, BasicBlock, [2, 2, 2, 2])
     elif name == "resnet34":
         model = resnet(args, BasicBlock, [3, 4, 6, 3])
+    elif name == "resnet50":
+        model = resnet(args, Bottleneck, [3, 4, 6, 3])
     elif name == "resnet_AL":
         model = resnet18_AL(args)
     elif name == "resnet18_SCPL":
@@ -190,8 +192,12 @@ def set_model(name):
         model = resnet_SCPL(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet_PredSim":
         model = resnet18_PredSim(args)
-    elif name == "resnet_Research":
+    elif name == "resnet18_Research":
         model = resnet_Research(args, BasicBlock, [2, 2, 2, 2])
+    elif name == "resnet34_Research":
+        model = resnet_Research(args, BasicBlock, [3, 4, 6, 3])
+    elif name == "resnet50_Research":
+        model = resnet_Research(args, Bottleneck, [3, 4, 6, 3])
     elif name == "CNN":
         model = CNN(args)
     elif name == "CNN_AL":
@@ -245,7 +251,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet_Research"]:
+            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -260,7 +266,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         base = time.time()
     
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet_Research"]:
+    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -297,7 +303,7 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet_Research"]:
+            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -312,7 +318,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet_Research"]:
+    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
