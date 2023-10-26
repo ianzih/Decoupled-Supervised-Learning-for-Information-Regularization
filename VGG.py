@@ -319,7 +319,43 @@ class VGG_Research(VGG_block):
             classifier_out = classifier(output)
                   
         return classifier_out, output
+
+class VGG_Research_Adaptive(VGG_Research):
+    def __init__(self, args):
+        super(VGG_Research_Adaptive, self).__init__(args)
+        self.countthreshold = args.patiencethreshold
+        self.costhreshold = args.cosinesimthreshold
+        self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        
+    def inference(self, x, y):
+        self.patiencecount = 0
+        # Layer1
+        classifier_out1, output = self._inference_each_layer(x, y , self.layer1, self.loss1, self.classifier1)
+        
+        # Layer2    
+        classifier_out2, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
+        self.patiencecount += self.AdaptiveCondition(classifier_out1 , classifier_out2)
+        if self.patiencecount >= self.countthreshold:
+            return classifier_out2
+            
+        # Layer3
+        classifier_out3, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
+        self.patiencecount += self.AdaptiveCondition(classifier_out2 , classifier_out3)
+        if self.patiencecount >= self.countthreshold:
+            return classifier_out3
+            
+        # Layer4
+        classifier_out4, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
+        return classifier_out4 
     
+    def AdaptiveCondition(self, fisrtlayer , prelayer):
+        fisrtlayer_maxarg = torch.argmax(fisrtlayer)
+        prelayer_maxarg = torch.argmax(prelayer)
+        cossimi = torch.mean(self.cos(fisrtlayer , prelayer))
+        if fisrtlayer_maxarg == prelayer_maxarg and cossimi > self.costhreshold:
+            return  1
+        
+        return 0    
     
 class VGG_PredSim(VGG_block):
     def __init__(self, args):

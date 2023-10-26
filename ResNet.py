@@ -111,8 +111,8 @@ class resnet(Resnet_block):
         self._shape_div_2()
         self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
         # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = nn.Linear(self.dim, self.num_classes)
-        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        # self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
+        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion *  self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
         
     def train_step(self, x , y):
         output = self.conv1(x)
@@ -249,15 +249,16 @@ class resnet_SCPL(Resnet_block):
         self.conv1 = conv_layer_bn(self.num_channel, self.dim, nn.ReLU(inplace=True), stride = 1, kernel_size=3)
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block = self.block, out_channels = self.dim, blocks = self.layers[0])
-        self.loss1 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self.shape)
+        self.loss1 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self.shape)
         self.layer2 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[1])
-        self.loss2 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self._shape_div_2())
+        self.loss2 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
         self.layer3 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[2])
-        self.loss3 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self._shape_div_2())
+        self.loss3 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
         self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
-        self.loss4 =  ContrastiveLoss(0.1, input_channel = self.dim, shape = self._shape_div_2())
+        self.loss4 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
         # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        # self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
+        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion * self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
 
         
     def train_step(self, x , y):
@@ -331,7 +332,6 @@ class resnet_Research(Resnet_block):
         self.loss4 = Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self._shape_div_2(),  args = args)
         self.classifier4 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
         
-        # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         
     def train_step(self, x, y):
         total_loss = 0
@@ -396,12 +396,8 @@ class resnet_Research(Resnet_block):
             output = output.detach()
             
         if self.merge == 'merge':
-            # projector_out = self.avgpool(projector_out)
-            # projector_out = projector_out.view(projector_out.size(0), -1)
             classifier_out = classifier(projector_out)
         elif self.merge == 'unmerge':
-            # output = self.avgpool(output)
-            # output = output.view(output.size(0), -1)
             classifier_out = classifier(output) 
         if freeze:
             classifier_out = classifier_out.detach()
@@ -414,12 +410,8 @@ class resnet_Research(Resnet_block):
         loss , projector_out= localloss(output, y)
             
         if self.merge == 'merge':
-            # projector_out = self.avgpool(projector_out)
-            # projector_out = projector_out.view(projector_out.size(0), -1)
             classifier_out = classifier(projector_out)
         elif self.merge == 'unmerge':
-            # output = self.avgpool(output)
-            # output = output.view(output.size(0), -1)
             classifier_out = classifier(output)
                   
         return classifier_out, output
