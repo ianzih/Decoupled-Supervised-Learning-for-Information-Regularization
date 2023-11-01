@@ -220,69 +220,37 @@ class VGG_Research(VGG_block):
         # layer_cfg = {0:[128, 256, "M"], 1:[256, 512, "M"], 2:[512, "M"], 3:[512, "M"]}
         # layer_cfg = {0: [64, 64, "M" ], 1:[128, 128, "M"], 2:[256, 256, 256, "M"], 3:[512, 512, 512, "M"], 4:[512, 512, 512, "M"]}
         layer_cfg = {0:[128, 128, 128, 256, "M"], 1:[256, 512, "M"], 2:[512, 512, "M"], 3:[512, "M"]}
-
-        self.layer1 = self._make_layer(layer_cfg[0])
-        self.loss1 =  Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args)
-        self.classifier1 = Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args)
         
-        self.layer2 = self._make_layer(layer_cfg[1])
-        self.loss2 =  Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args)
-        self.classifier2 = Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args)
+        self.layer = nn.ModuleList()
+        self.loss = nn.ModuleList()
+        self.classifier = nn.ModuleList()
         
-        self.layer3 = self._make_layer(layer_cfg[2])
-        self.loss3 =  Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args)
-        self.classifier3 = Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args)
-        
-        self.layer4 = self._make_layer(layer_cfg[3]) 
-        self.loss4 =  Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args)
-        self.classifier4 = Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args)
+        for i in range(self.blockwisetotal):
+            self.layer.append(self._make_layer(layer_cfg[i]))
+            self.loss.append(Set_Local_Loss(input_channel = self.in_channels, shape = self._shape_div_2(), args = args))
+            self.classifier.append(Layer_Classifier(input_channel = (self.in_channels * self.shape * self.shape), args = args))
         
         self.ce = nn.CrossEntropyLoss()
 
     def train_step(self, x, y):
         total_loss = 0
         total_classifier_loss = 0
-    
-        # Layer1
-        loss, classifier_loss, output = self._training_each_layer(x, y , self.layer1, self.loss1, self.classifier1)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
+        output = x
         
-        # Layer2    
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
-            
-        # Layer3
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
-            
-        # Layer4
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
+        for i in range(self.blockwisetotal):
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer[i], self.loss[i], self.classifier[i])
+            total_loss += loss
+            total_classifier_loss += classifier_loss
              
         return (total_loss + total_classifier_loss) 
         
     def inference(self, x, y):
         classifier_output = {i: [] for i in range(1, self.blockwisetotal + 1)}
-    
-        # Layer1
-        classifier_out, output = self._inference_each_layer(x, y , self.layer1, self.loss1, self.classifier1)
-        classifier_output[1].append(classifier_out)
+        output = x
         
-        # Layer2    
-        classifier_out, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        classifier_output[2].append(classifier_out)
-            
-        # Layer3
-        classifier_out, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        classifier_output[3].append(classifier_out)
-            
-        # Layer4
-        classifier_out, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        classifier_output[4].append(classifier_out)
+        for i in range(self.blockwisetotal):
+            classifier_out, output = self._inference_each_layer(output, y , self.layer[i], self.loss[i], self.classifier[i])
+            classifier_output[i+1].append(classifier_out)
              
         return output ,  classifier_output
     

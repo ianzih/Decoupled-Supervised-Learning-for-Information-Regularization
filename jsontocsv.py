@@ -1,15 +1,15 @@
 import json
 import csv
 import argparse
-import pandas as pd
 import os
 
 
 def get_arguments():
     parser = argparse.ArgumentParser(description="json argu", add_help=False)
-    parser.add_argument("--jsonfilepath", type = str, default="(cifar100).josn", help ='json file path for model result info.')
+    parser.add_argument("--jsonfilepath", type = str, default="(cifar100).json", help ='json file path for model result info.')
     parser.add_argument("--maincontent", type = str, default="Round Time Result Summary", help ='json file main content.')
     parser.add_argument("--savepath", type = str, default="./modelresultCSV/", help ='save csv path')
+    parser.add_argument("--mainfunc", type = str, default="time", help ='set main function, all, time.')
     return parser.parse_args()
 args =  get_arguments() 
 
@@ -66,15 +66,24 @@ class Jsonwriter(object):
 def main():
     writer = Jsonwriter(args)
     jsondata = writer.read_json_file(args)
-    for times, time in enumerate(jsondata):
-        modelinfolist = list()
-        for _, epoch in enumerate(jsondata[time]):
-            content = writer.json_info(jsondata[time][epoch])
-            modelinfolist.append(content)
-        model_pd = pd.DataFrame(modelinfolist)
-        if not os.path.exists(args.savepath):
-            os.makedirs(args.savepath)
-        model_pd.to_csv(args.savepath + 'result' + str(times) + '.csv', index=False)
+    if(args.mainfunc == "all"):
+        for times, time in enumerate(jsondata):
+            modelinfolist = list()
+            for _, epoch in enumerate(jsondata[time]):
+                content = writer.json_info(jsondata[time][epoch])
+                modelinfolist.append(content)
+            model_pd = pd.DataFrame(modelinfolist)
+            if not os.path.exists(args.savepath):
+                os.makedirs(args.savepath)
+            model_pd.to_csv(args.savepath + 'result' + str(times) + '.csv', index=False)
+    elif(args.mainfunc == "time"):
+        totaltime  = 0
+        for times, time in enumerate(jsondata):
+            for _, epoch in enumerate(jsondata[time]):
+                totaltime += jsondata[time][epoch]['Test Time']
+            break
+            
+        print("time: {:.2f}".format(totaltime / 400))
     
 if __name__ == '__main__':
     main()

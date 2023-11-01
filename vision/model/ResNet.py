@@ -316,22 +316,17 @@ class resnet_Research(Resnet_block):
         
         self.conv1 = conv_layer_bn(self.num_channel, self.dim, nn.ReLU(inplace=True), stride = 1, kernel_size=3)
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block = self.block, out_channels = self.dim, blocks = self.layers[0])
-        self.loss1 = Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self.shape,  args = args)
-        self.classifier1 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
+        self.layer = nn.ModuleList()
+        self.loss = nn.ModuleList()
+        self.classifier = nn.ModuleList()
         
-        self.layer2 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[1])
-        self.loss2 = Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self._shape_div_2(),  args = args)
-        self.classifier2 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
-        
-        self.layer3 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[2])
-        self.loss3 = Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self._shape_div_2(),  args = args)
-        self.classifier3 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
-        
-        self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
-        self.loss4 = Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self._shape_div_2(),  args = args)
-        self.classifier4 = Layer_Classifier(input_channel = (self.dim * self.shape * self.shape), args = args)
-        
+        self.layer.append(self._make_layer(block = self.block, out_channels = self.dim, blocks = self.layers[0]))
+        self.loss.append(Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self.shape,  args = args))
+        self.classifier.append(Layer_Classifier(input_channel = (self.dim * self.shape * self.shape * self.expansion), args = args))
+        for i in range(1 , self.blockwisetotal):
+            self.layer.append(self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[i]))
+            self.loss.append(Set_Local_Loss(input_channel = self.dim * self.expansion, shape = self._shape_div_2(),  args = args))
+            self.classifier.append(Layer_Classifier(input_channel = (self.dim * self.shape * self.shape * self.expansion), args = args))     
         
     def train_step(self, x, y):
         total_loss = 0
@@ -339,24 +334,10 @@ class resnet_Research(Resnet_block):
     
         # Layer1
         output = self.conv1(x)
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer1, self.loss1, self.classifier1)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
-        
-        # Layer2    
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
-            
-        # Layer3
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
-            
-        # Layer4
-        loss, classifier_loss, output = self._training_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        total_loss += loss
-        total_classifier_loss += classifier_loss
+        for i in range(self.blockwisetotal):
+            loss, classifier_loss, output = self._training_each_layer(output, y , self.layer[i], self.loss[i], self.classifier[i])
+            total_loss += loss
+            total_classifier_loss += classifier_loss
              
         return (total_loss + total_classifier_loss) 
     
@@ -365,20 +346,9 @@ class resnet_Research(Resnet_block):
     
         # Layer1
         output = self.conv1(x)
-        classifier_out, output = self._inference_each_layer(output, y , self.layer1, self.loss1, self.classifier1)
-        classifier_output[1].append(classifier_out)
-        
-        # Layer2    
-        classifier_out, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        classifier_output[2].append(classifier_out)
-            
-        # Layer3
-        classifier_out, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        classifier_output[3].append(classifier_out)
-            
-        # Layer4
-        classifier_out, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        classifier_output[4].append(classifier_out)
+        for i in range(self.blockwisetotal):
+            classifier_out, output = self._inference_each_layer(output, y , self.layer[i], self.loss[i], self.classifier[i])
+            classifier_output[i+1].append(classifier_out)
              
         return output ,  classifier_output
 
@@ -415,7 +385,46 @@ class resnet_Research(Resnet_block):
             classifier_out = classifier(output)
                   
         return classifier_out, output
+
+class resnet_Research_Adaptive(resnet_Research):
+    def __init__(self, args, block, layers):
+        super(resnet_Research_Adaptive, self).__init__(args, block, layers)
+        self.countthreshold = args.patiencethreshold
+        self.costhreshold = args.cosinesimthreshold
+        self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        
+    def inference(self, x, y):
+        self.patiencecount = 0
+         # Layer1
+        output = self.conv1(x)
+        classifier_out1, output = self._inference_each_layer(output, y , self.layer1, self.loss1, self.classifier1)
+        
+        # Layer2    
+        classifier_out2, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
+        self.patiencecount += self.AdaptiveCondition(classifier_out1 , classifier_out2)
+        if self.patiencecount >= self.countthreshold:
+            return classifier_out2
+            
+        # Layer3
+        classifier_out3, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
+        self.patiencecount += self.AdaptiveCondition(classifier_out2 , classifier_out3)
+        if self.patiencecount >= self.countthreshold:
+            return classifier_out3
+            
+        # Layer4
+        classifier_out4, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
+        return classifier_out4 
     
+    def AdaptiveCondition(self, fisrtlayer , prelayer):
+        fisrtlayer_maxarg = torch.argmax(fisrtlayer)
+        prelayer_maxarg = torch.argmax(prelayer)
+        cossimi = torch.mean(self.cos(fisrtlayer , prelayer))
+        if fisrtlayer_maxarg == prelayer_maxarg and cossimi > self.costhreshold:
+            return  1
+        
+        return 0    
+
+  
 class resnet18_PredSim(nn.Module):
 
     def __init__(self, args):

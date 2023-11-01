@@ -1,6 +1,6 @@
-from ResNet import *
-from VGG import *
-from vanillaCNN import *
+from vision.model.ResNet import *
+from vision.model.VGG import *
+from vision.model.vanillaCNN import *
 from utils import *
 from torchvision import transforms, datasets
 
@@ -148,6 +148,8 @@ def set_model(name , args):
         model = resnet_Research(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet50_Research":
         model = resnet_Research(args, Bottleneck, [3, 4, 6, 3])
+    elif name == "resnet18_Research_Adaptive":
+        model = resnet_Research_Adaptive(args, BasicBlock, [2, 2, 2, 2])
     elif name == "CNN":
         model = CNN(args)
     elif name == "CNN_AL":

@@ -8,10 +8,7 @@ import argparse
 import numpy as np
 
 from utils import AverageMeter, accuracy, GetModelSizeVision, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
-from ResNet import *
-from VGG import *
-from vanillaCNN import *
-from setting import *
+from vision.setting import *
 
 
 def get_arguments():
