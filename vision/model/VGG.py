@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
-from utils import conv_layer_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss, VICRIG, Layer_Classifier, Set_Local_Loss
+from utils.utils import *
+from utils.vision_utils import *
+
 
 class VGG_block(nn.Module):
     def __init__(self, args):

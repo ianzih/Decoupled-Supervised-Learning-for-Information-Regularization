@@ -7,7 +7,8 @@ import time
 import argparse
 import numpy as np
 
-from utils import AverageMeter, accuracy, GetModelSizeVision, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
+from utils.utils import *
+from utils.vision_utils import *
 from vision.setting import *
 
 
@@ -15,6 +16,7 @@ def get_arguments():
     parser = argparse.ArgumentParser(description="Vision argu", add_help=False)
 
     # Model 
+    parser.add_argument("--task", type = str, default = "vision", help = 'task')
     parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [CNN, CNN_AL, CNN_SCPL, CNN_PredSim, \
         VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_Research, resnet, resnet_AL, resnet_SCPL, resnet_PredSim, VGG_Research_Dynamic]')
     
@@ -49,6 +51,7 @@ def get_arguments():
     parser.add_argument('--epoch_now', type = int, default = 1, help = 'Number of epoch now')
     parser.add_argument('--patiencethreshold', type = int, default = 1, help = 'threshold of inference adaptive patience count')
     parser.add_argument('--cosinesimthreshold', type = float, default = 0.8, help = 'threshold of inference adaptive cosine similarity')
+    parser.add_argument('--projectortype', type = str, default = "mlp", help = 'projector head type in loss func.')
     
     return parser.parse_args()
 

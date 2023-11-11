@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from utils import conv_layer_bn, conv_1x1_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss, Layer_Classifier, Set_Local_Loss
-
+from utils.utils import *
+from utils.vision_utils import *
 
 
 class BasicBlock(nn.Module):

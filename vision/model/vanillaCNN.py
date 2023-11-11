@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
-from utils import conv_layer_bn, Flatten, ALComponent, ContrastiveLoss, PredSimLoss
+from utils.utils import *
+from utils.vision_utils import *
 
 class CNN(nn.Module):
     def __init__(self, args):

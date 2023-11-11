@@ -1,7 +1,7 @@
 from vision.model.ResNet import *
 from vision.model.VGG import *
 from vision.model.vanillaCNN import *
-from utils import *
+from utils.utils import *
 from torchvision import transforms, datasets
 
 def set_optim(model, optimal='LARS', args = None):
