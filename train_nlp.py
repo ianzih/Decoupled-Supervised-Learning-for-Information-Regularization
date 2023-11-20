@@ -1,34 +1,30 @@
 import torch
 
 import os
-import math
 import sys
 import time
 import argparse
 import numpy as np
 
-from utils.utils import *
-from utils.vision_utils import *
-from vision.setting import *
+from utils.utils import AverageMeter, accuracy, GetModelSize, SetGPUDevices, Adjust_Learning_Rate, ResultRecorder, Calculate_GPUs_usage
+from nlp.setting import *
 
 
 def get_arguments():
     parser = argparse.ArgumentParser(description="Vision argu", add_help=False)
 
     # Model 
-    parser.add_argument("--task", type = str, default = "vision", help = 'task')
-    parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [CNN, CNN_AL, CNN_SCPL, CNN_PredSim, \
-        VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_Research, resnet, resnet_AL, resnet_SCPL, resnet_PredSim, VGG_Research_Dynamic]')
+    parser.add_argument("--task", type = str, default = "nlp", help = 'task')
+    parser.add_argument("--model", type = str, default = "nlp_Research", help = 'Model Name []')
     
     # Dataset 
-    parser.add_argument("--dataset", type = str, default = "cifar100", help = 'Dataset (cifar10, cifar100, tinyImageNet)')
-    parser.add_argument("--aug_type", type = str, default = "strong", help = 'Dataset augmentation type(strong or basic)')
-    parser.add_argument("--n_classes", type = int, default = 100, help = 'Number of Dataset classes)')
+    parser.add_argument("--dataset", type = str, default = "IMDB", help = 'Dataset (IMDB, ag_news)')
+    parser.add_argument("--n_classes", type = int, default = 2, help = 'Number of Dataset classes)')
     
     # Optim
     parser.add_argument("--optimal", type = str, default = "LARS", help = 'Optimal Name (LARS, SGD, ADAM)')
-    parser.add_argument('--epochs', type = int, default = 400, help = 'Number of training epochs')
-    parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
+    parser.add_argument('--epochs', type = int, default = 100, help = 'Number of training epochs')
+    parser.add_argument('--train_bsz', type = int, default = 1024, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
     parser.add_argument('--base_lr', type = float, default = 0.2, help = 'Initial learning rate')
     parser.add_argument('--end_lr', type = float, default = 0.002, help = 'Learning rate at the end of training')
@@ -40,8 +36,20 @@ def get_arguments():
     parser.add_argument('--gpus', type=str, default="0", help=' ID of the GPU device. If you want to use multiple GPUs, you can separate their IDs with commas, \
          e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
+    # nlp config
+    parser.add_argument('--max_len', type=int, help='Maximum length for the sequence of input samples', default="350")
+    parser.add_argument('--h_dim', type=int, help='Dimensions of the hidden layer', default="300")
+    parser.add_argument('--heads', type=int, help='Number of heads in the transformer encoder. \
+                        This option is only available for the transformer model.', default="6")
+    parser.add_argument('--vocab_size', type=int, help='Size of vocabulary dictionary.', default="30000")
+    parser.add_argument('--word_vec_type', type=str, help='Type of word embedding, if dont use word embedding, please set "nor"', default="pretrain")
+    parser.add_argument('--word_vec', type=str, help='store of word embedding', default = "glove")
+    parser.add_argument('--emb_dim', type=int, help='Dimension of word embedding', default="300")
+    parser.add_argument('--noise_rate', type=float, help='Noise rate of labels in training dataset (default is 0 for no noise).', default=0.0)
+    
     # other config
-    parser.add_argument('--blockwise_total', type = int, default = 4, help = 'A total of model blockwise')
+    parser.add_argument('--blockwise_total', type = int, default = 4, help = 'Number of layers of the model. The minimum is \"2\". \
+                        The first layer is the pre-training embedding layer, and the latter layer is lstm or transformer.')
     parser.add_argument("--mlp", type = str, default = "2048-2048-2048", help = 'Size and number of layers of the MLP expander head')
     parser.add_argument("--merge", type = str, default="merge", help =' Decide whether to merge the classifier into the projector (merge, unmerge)')
     parser.add_argument("--showmodelsize", type = bool, default = False, help = 'Whether show model size (True, False)')
@@ -51,13 +59,12 @@ def get_arguments():
     parser.add_argument('--epoch_now', type = int, default = 1, help = 'Number of epoch now')
     parser.add_argument('--patiencethreshold', type = int, default = 1, help = 'threshold of inference adaptive patience count')
     parser.add_argument('--cosinesimthreshold', type = float, default = 0.8, help = 'threshold of inference adaptive cosine similarity')
-    parser.add_argument('--projectortype', type = str, default = "mlp", help = 'projector head type in loss func.')
     
     return parser.parse_args()
 
 args =  get_arguments()
 
-def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset):
+def train(train_loader, model, optimizer, global_steps, epoch, dataset):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -66,14 +73,6 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
 
     base = time.time()
     for step, (X, Y) in enumerate(train_loader):
-        if aug_type == "strong":
-            if dataset == "cifar10" or dataset == "cifar100":
-                X = torch.cat(X)
-                Y = torch.cat(Y)
-            else:
-                X = torch.cat(X)
-                Y = torch.cat([Y, Y])
-
         model.train()
         data_time.update(time.time()-base)
 
@@ -85,9 +84,6 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         global_steps += 1
 
         loss = model(X, Y)
-
-        if type(loss) == dict:
-            loss = sum(loss["f"]) + sum(loss["b"]) + sum(loss["ae"])
                             
         optimizer.zero_grad()
         loss.backward()
@@ -97,7 +93,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+            if args.model in ["LSTM_Research"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -112,7 +108,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         base = time.time()
     
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+    if args.model in ["LSTM_Research"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -149,7 +145,7 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+            if args.model in ["LSTM_Research"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -164,7 +160,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+    if args.model in ["LSTM_Research"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
@@ -188,7 +184,8 @@ def main(time, result_recorder):
     global_steps = 0
     
     GPU_list = SetGPUDevices(args.gpus)
-    train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type)
+    train_loader, test_loader, args.n_classes, args.word_vec = set_loader(args.dataset, args)
+    
     model = set_model(args.model, args).cuda() if torch.cuda.is_available() else set_model(args.model, args)
     optimizer = set_optim(model= model, optimal= args.optimal, args = args)
     GetModelSize(model, train_loader, args)
@@ -199,7 +196,7 @@ def main(time, result_recorder):
         lr = Adjust_Learning_Rate(optimizer, args.base_lr, args.end_lr, global_steps, args.max_steps)
         args.epoch_now = epoch
         print("lr: {:.6f}".format(lr))
-        loss, train_acc, global_steps, train_classifier_acc, train_time = train(train_loader, model, optimizer, global_steps, epoch, args.aug_type, args.dataset)
+        loss, train_acc, global_steps, train_classifier_acc, train_time = train(train_loader, model, optimizer, global_steps, epoch, args.dataset)
         test_acc,  test_classifier_acc, test_time= test(test_loader, model, epoch)
 
         if test_acc > best_acc:
@@ -214,7 +211,7 @@ def main(time, result_recorder):
         
     # Save Checkpoints    
     state = { "configs": args, "model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
-    save_files = os.path.join("./save_models/", "ckpt_last_{0}.pth".format(i))
+    save_files = os.path.join("./save_nlp_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
     
     del state

@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
-import random
-import numpy as np
 import math
 import os
 import json
 import torch.nn.functional as F
 from torch import optim
+from utils.vision_utils import *
+
 
 class ALComponent(nn.Module):
     """
@@ -346,7 +346,7 @@ class LARS(optim.Optimizer):
     def exclude_bias_and_norm(p):
         return p.ndim == 1
     
-def GetModelSizeVision(model, train_loader, args):
+def GetModelSize(model, train_loader, args):
     try:
         from torchinfo import summary
     except Exception as E:
@@ -354,8 +354,8 @@ def GetModelSizeVision(model, train_loader, args):
         os._exit(0)
     
     if args.showmodelsize == True:
-        for step, (X, Y) in enumerate(train_loader): 
-            if args.aug_type == "strong":
+        for _, (X, Y) in enumerate(train_loader): 
+            if args.aug_type == "strong" and args.task == "vision":
                 if args.dataset == "cifar10" or args.dataset == "cifar100":
                     X = torch.cat(X).cuda(non_blocking=True)
                     Y = torch.cat(Y).cuda(non_blocking=True)
@@ -451,6 +451,8 @@ class ResultRecorder(object):
         }
     
     def _makefinalresult(self):
+        if self.args.task == "nlp":
+            self.args.word_vec = "save"
         self.hyperparam = vars(self.args)
         final_result = {
             'Model Hyperparam' : self.hyperparam,
