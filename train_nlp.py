@@ -48,9 +48,9 @@ def get_arguments():
     parser.add_argument('--noise_rate', type=float, help='Noise rate of labels in training dataset (default is 0 for no noise).', default=0.0)
     
     # other config
-    parser.add_argument('--blockwise_total', type = int, default = 4, help = 'Number of layers of the model. The minimum is \"2\". \
+    parser.add_argument('--blockwise_total', type = int, default = 5, help = 'Number of layers of the model. The minimum is \"2\". \
                         The first layer is the pre-training embedding layer, and the latter layer is lstm or transformer.')
-    parser.add_argument("--mlp", type = str, default = "2048-2048-2048", help = 'Size and number of layers of the MLP expander head')
+    parser.add_argument("--mlp", type = str, default = "300-300-300", help = 'Size and number of layers of the MLP expander head')
     parser.add_argument("--merge", type = str, default="merge", help =' Decide whether to merge the classifier into the projector (merge, unmerge)')
     parser.add_argument("--showmodelsize", type = bool, default = False, help = 'Whether show model size (True, False)')
     parser.add_argument("--jsonfilepath", type = str, default="./modelresult/", help ='json file path for model result info.')
@@ -69,7 +69,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
     data_time = AverageMeter()
     losses = AverageMeter()
     accs = AverageMeter()
-    classifier_acc = [AverageMeter() for _ in range(args.blockwise_total)]
+    classifier_acc = [AverageMeter() for _ in range(args.blockwise_total - 1)]
 
     base = time.time()
     for step, (X, Y) in enumerate(train_loader):
@@ -134,7 +134,7 @@ def test(test_loader, model, epoch):
 
     batch_time = AverageMeter()
     accs = AverageMeter()
-    classifier_acc = [AverageMeter() for _ in range(args.blockwise_total)]
+    classifier_acc = [AverageMeter() for _ in range(args.blockwise_total - 1)]
 
     with torch.no_grad():
         base = time.time()
@@ -219,9 +219,10 @@ def main(time, result_recorder):
 
 if __name__ == '__main__':
     result_recorder = ResultRecorder(args)
+    word_vec_temp = args.word_vec
     for i in range(args.train_time):
         main(i, result_recorder)
-        
+        args.word_vec = word_vec_temp
     
     
 

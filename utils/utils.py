@@ -67,11 +67,11 @@ class ALComponent(nn.Module):
         return t0
 
 class VICRIG(nn.Module):
-    def __init__(self, input_channel = 256, shape = 32 , args = None):
+    def __init__(self, input_channel = 256, shape = 32 , args = None, activation = nn.ReLU()):
         super(VICRIG, self).__init__()
         self.n_class = args.n_classes
         self.num_features = int(args.mlp.split("-")[-1])
-        self.projector = Projector(args, int(input_channel * shape * shape))
+        self.projector = Projector(args, int(input_channel * shape * shape), activation)
         
     def forward(self, x, label):
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -104,10 +104,13 @@ class VICRIG(nn.Module):
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.1, mid_neurons = 512, out_neurons = 1024, input_channel = 256, shape = 32):
+    def __init__(self, temperature=0.1, mid_neurons = 512, out_neurons = 1024, input_channel = 256, shape = 32, args = None ,activation = nn.ReLU()):
         super(ContrastiveLoss, self).__init__()
         input_neurons = int(input_channel * shape * shape)
-        self.linear = nn.Sequential(Flatten(), nn.Linear(input_neurons, mid_neurons), nn.ReLU(), nn.Linear(mid_neurons, out_neurons))
+        if args.task != "nlp":
+            self.linear = nn.Sequential(Flatten(), nn.Linear(input_neurons, mid_neurons), activation, nn.Linear(mid_neurons, out_neurons))
+        else:
+            self.linear = nn.Sequential(nn.Linear(input_neurons, mid_neurons), activation, nn.Linear(mid_neurons, out_neurons))
         self.temperature = temperature
     
     def forward(self, x, label):
@@ -183,44 +186,48 @@ class PredSimLoss(nn.Module):
         return loss
     
 class Layer_Classifier(nn.Module):
-    def __init__(self, input_channel = 2048, args = None):
+    def __init__(self, input_channel = 2048, args = None, activation = nn.ReLU()):
         super().__init__()
         self.n_class = args.n_classes
         self.num_features = int(args.mlp.split("-")[-1])
-        self.classifier = Classifier(args, input_channel, self.num_features)
+        self.classifier = Classifier(args, input_channel, self.num_features, activation)
     
     def forward(self, x):
         output = self.classifier(x)
         
         return output
         
-
-def Projector(args, input_channel):
+def Projector(args, input_channel, activation = nn.ReLU()):
     mlp_spec = f"{input_channel}-{args.mlp}"
     layers = []
     f = list(map(int, mlp_spec.split("-")))
-    layers.append(Flatten())
+    if args.task == "vision":
+        layers.append(Flatten())
     for i in range(len(f) - 2):
         layers.append(nn.Linear(f[i], f[i + 1]))
-        layers.append(nn.BatchNorm1d(f[i + 1]))
-        layers.append(nn.ReLU())
+        if args.task == "vision":
+            layers.append(nn.BatchNorm1d(f[i + 1]))
+        layers.append(activation)
     layers.append(nn.Linear(f[-2], f[-1]))
     return nn.Sequential(*layers)
 
-def Classifier(args, input_channel, final_channels):
+def Classifier(args, input_channel, final_channels, activation = nn.ReLU()):
     mlp_spec = f"{input_channel}-{args.mlp}"
     layers = []
     f = list(map(int, mlp_spec.split("-")))
     if args.merge == 'unmerge':
-        layers.append(Flatten())
+        if args.task == "vision":
+            layers.append(Flatten())
         for i in range(len(f) - 2):
             layers.append(nn.Linear(f[i], f[i + 1]))
-            layers.append(nn.BatchNorm1d(f[i + 1]))
-            layers.append(nn.ReLU())
+            if args.task == "vision":
+                layers.append(nn.BatchNorm1d(f[i + 1]))
+            layers.append(activation)
         layers.append(nn.Linear(f[-2], args.n_classes))
     else:
-        layers.append(nn.BatchNorm1d(final_channels))
-        layers.append(nn.ReLU())
+        if args.task == "vision":
+            layers.append(nn.BatchNorm1d(final_channels))
+        layers.append(activation)
         layers.append(nn.Linear(final_channels, args.n_classes))
     return nn.Sequential(*layers)
 
@@ -242,11 +249,11 @@ def off_diagonal(x):
     assert n == m
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
 
-def Set_Local_Loss(args, input_channel, shape):
+def Set_Local_Loss(args, input_channel, shape, activation = nn.ReLU()):
     if args.localloss == 'VICRIG':
-        return VICRIG(input_channel, shape, args)
+        return VICRIG(input_channel, shape, args, activation)
     elif args.localloss == 'contrastive':
-        return ContrastiveLoss(input_channel, shape, args)
+        return ContrastiveLoss(input_channel = input_channel, shape = shape, args = args, activation = nn.ReLU())
 
 
 class AverageMeter(object):
