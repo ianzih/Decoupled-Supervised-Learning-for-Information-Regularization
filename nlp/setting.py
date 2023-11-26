@@ -59,6 +59,8 @@ def set_model(name , args):
         model = LSTM(args)
     elif name == "LSTM_Research":
         model = LSTM_Research(args)
+    elif name == "LSTM_SCPL":
+        model = LSTM_SCPL(args)
     else:
         raise ValueError("Model not supported: {}".format(name))
     

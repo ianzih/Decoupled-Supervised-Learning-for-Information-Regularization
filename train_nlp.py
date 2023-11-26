@@ -211,6 +211,8 @@ def main(time, result_recorder):
         
     # Save Checkpoints    
     state = { "configs": args, "model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+    if not os.path.exists("./save_nlp_models/"):
+        os.makedirs("./save_nlp_models/")
     save_files = os.path.join("./save_nlp_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
     

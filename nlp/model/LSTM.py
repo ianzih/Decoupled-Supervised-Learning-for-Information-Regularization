@@ -84,6 +84,75 @@ class LSTM(LSTM_block):
          
         return output
 
+
+class LSTM_SCPL(LSTM_block):
+    def __init__(self, args):
+        super(LSTM_SCPL, self).__init__(args)
+        # embedding
+        self.embedding = self._make_layer(in_dim = self.vocab_size, out_dim = self.emb_dim, word_vec_type = args.word_vec_type)
+        self.loss0 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
+        # layer1
+        self.layer1 = self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim)
+        self.loss1 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
+        # layer2
+        self.layer2 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        self.loss2 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
+        # layer3
+        self.layer3 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        self.loss3 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
+        #layer4
+        self.layer4 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        self.loss4 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
+        
+        self.fc = self.predictlayer(in_dim = self.h_dim, hidden_dim = self.h_dim, out_dim = self.n_classes, act_fun = nn.Tanh())
+        self.ce = nn.CrossEntropyLoss()
+        
+    def train_step(self, x, y):
+        loss = 0
+        hidden = None
+        # embedding
+        emb = self.embedding(x)
+        loss += self.loss0(emb.mean(1), y)
+        emb = emb.detach()
+        # LSTM1
+        output, hidden = self.layer1(emb, hidden)
+        loss += self.loss1((hidden[0][0] + hidden[0][1]) / 2, y)
+        hidden = (hidden[0].detach() , hidden[1].detach())
+        # LSTM2
+        output, hidden = self.layer2(output.detach(), hidden)
+        loss += self.loss2((hidden[0][0] + hidden[0][1]) / 2, y)
+        hidden = (hidden[0].detach() , hidden[1].detach())
+        # LSTM3
+        output, hidden = self.layer3(output.detach(), hidden)
+        loss += self.loss3((hidden[0][0] + hidden[0][1]) / 2, y)
+        hidden = (hidden[0].detach() , hidden[1].detach())
+        # LSTM4
+        output, hidden = self.layer4(output.detach(), hidden)
+        loss += self.loss4((hidden[0][0] + hidden[0][1]) / 2, y)
+        hidden = (hidden[0].detach() , hidden[1].detach())
+        
+        output = self.fc(((hidden[0][0] + hidden[0][1]) / 2).detach())
+        loss += self.ce(output, y)
+        return loss
+          
+    def inference(self, x, y):
+        hidden = None
+        # embedding
+        emb = self.embedding(x)
+        # LSTM1
+        output, hidden = self.layer1(emb, hidden)
+        # LSTM2
+        output, hidden = self.layer2(output, hidden)
+        # LSTM3
+        output, hidden = self.layer3(output, hidden)
+        # LSTM4
+        output, hidden = self.layer4(output, hidden)
+        
+        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+         
+        return output
+
+
 class LSTM_Research(LSTM_block):
     def __init__(self, args):
         super(LSTM_Research,self).__init__(args)
@@ -93,6 +162,7 @@ class LSTM_Research(LSTM_block):
         
         self.ce = nn.CrossEntropyLoss()
         self.embedding = self._make_layer(in_dim = self.vocab_size, out_dim = self.emb_dim, word_vec_type = args.word_vec_type)
+        self.lossemb = (Set_Local_Loss(input_channel = self.emb_dim, shape = 1, args = args, activation = nn.Tanh()))  
         for i in range(0, self.blockwisetotal - 1):
             if i == 0:
                 self.layer.append(self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim))
@@ -109,6 +179,10 @@ class LSTM_Research(LSTM_block):
         total_classifier_loss = 0
         
         emb = self.embedding(x)
+        loss , _= self.lossemb(emb.mean(1), y)
+        emb = emb.detach()
+        total_loss += loss
+                
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
             loss , classifier_loss , output , hidden = self._training_each_layer(output, y , hidden, self.layer[i], self.loss[i], self.classifier[i])

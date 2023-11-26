@@ -71,7 +71,10 @@ class VICRIG(nn.Module):
         super(VICRIG, self).__init__()
         self.n_class = args.n_classes
         self.num_features = int(args.mlp.split("-")[-1])
-        self.projector = Projector(args, int(input_channel * shape * shape), activation)
+        if args.task != "nlp":
+            self.projector = Projector(args, int(input_channel * shape * shape), activation)
+        else:
+            self.projector = nn.Identity()
         
     def forward(self, x, label):
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -110,7 +113,7 @@ class ContrastiveLoss(nn.Module):
         if args.task != "nlp":
             self.linear = nn.Sequential(Flatten(), nn.Linear(input_neurons, mid_neurons), activation, nn.Linear(mid_neurons, out_neurons))
         else:
-            self.linear = nn.Sequential(nn.Linear(input_neurons, mid_neurons), activation, nn.Linear(mid_neurons, out_neurons))
+            self.linear = nn.Identity()
         self.temperature = temperature
     
     def forward(self, x, label):
