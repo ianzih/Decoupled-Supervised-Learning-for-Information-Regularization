@@ -16,6 +16,7 @@ def get_arguments():
     # Model 
     parser.add_argument("--task", type = str, default = "nlp", help = 'task')
     parser.add_argument("--model", type = str, default = "nlp_Research", help = 'Model Name []')
+    parser.add_argument("--model_weights_path", type = str, default = None, help = 'model weights path')
     
     # Dataset 
     parser.add_argument("--dataset", type = str, default = "IMDB", help = 'Dataset (IMDB, ag_news)')
@@ -24,7 +25,7 @@ def get_arguments():
     # Optim
     parser.add_argument("--optimal", type = str, default = "LARS", help = 'Optimal Name (LARS, SGD, ADAM)')
     parser.add_argument('--epochs', type = int, default = 100, help = 'Number of training epochs')
-    parser.add_argument('--train_bsz', type = int, default = 1024, help = 'Batch size of training data')
+    parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
     parser.add_argument('--base_lr', type = float, default = 0.2, help = 'Initial learning rate')
     parser.add_argument('--end_lr', type = float, default = 0.002, help = 'Learning rate at the end of training')
@@ -48,7 +49,7 @@ def get_arguments():
     parser.add_argument('--noise_rate', type=float, help='Noise rate of labels in training dataset (default is 0 for no noise).', default=0.0)
     
     # other config
-    parser.add_argument('--blockwise_total', type = int, default = 5, help = 'Number of layers of the model. The minimum is \"2\". \
+    parser.add_argument('--blockwise_total', type = int, default = 5, help = 'Number of layers of the model.(embedding(1) + LSTM(4)) The minimum is \"2\". \
                         The first layer is the pre-training embedding layer, and the latter layer is lstm or transformer.')
     parser.add_argument("--mlp", type = str, default = "300-300-300", help = 'Size and number of layers of the MLP expander head')
     parser.add_argument("--merge", type = str, default="merge", help =' Decide whether to merge the classifier into the projector (merge, unmerge)')
@@ -59,6 +60,7 @@ def get_arguments():
     parser.add_argument('--epoch_now', type = int, default = 1, help = 'Number of epoch now')
     parser.add_argument('--patiencethreshold', type = int, default = 1, help = 'threshold of inference adaptive patience count')
     parser.add_argument('--cosinesimthreshold', type = float, default = 0.8, help = 'threshold of inference adaptive cosine similarity')
+    parser.add_argument('--side_dim', nargs='+', type=int, default = None, help = 'side input dimention. e.g., \"200 150\".')
     
     return parser.parse_args()
 
@@ -93,7 +95,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["LSTM_Research"]:
+            if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -108,7 +110,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         base = time.time()
     
     # print info
-    if args.model in ["LSTM_Research"]:
+    if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -139,13 +141,12 @@ def test(test_loader, model, epoch):
     with torch.no_grad():
         base = time.time()
         for step, (X, Y) in enumerate(test_loader):
- 
             if torch.cuda.is_available():
                 X = X.cuda(non_blocking=True)
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["LSTM_Research"]:
+            if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -160,7 +161,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model in ["LSTM_Research"]:
+    if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
@@ -202,6 +203,8 @@ def main(time, result_recorder):
         if test_acc > best_acc:
             best_acc = test_acc
             best_epoch = epoch
+            bestmodel = model
+            bestoptimizer = optimizer
             best_acc_layer = np.argmax(test_classifier_acc)
         result_recorder.epochresult(time, epoch, lr, train_acc, train_classifier_acc, loss, train_time, test_acc, test_classifier_acc, test_time)
         
@@ -210,14 +213,14 @@ def main(time, result_recorder):
     result_recorder.save(args.jsonfilepath)
         
     # Save Checkpoints    
-    state = { "configs": args, "model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
+    state = { "configs": args, "model": bestmodel.state_dict(), "optimizer": bestoptimizer.state_dict(), "epoch": best_epoch}
     if not os.path.exists("./save_nlp_models/"):
         os.makedirs("./save_nlp_models/")
     save_files = os.path.join("./save_nlp_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
     
     del state
-    print("Best accuracy: {:.2f}".format(best_acc))
+    print("Best accuracy: {:.2f}".format(best_acc), "Best epoch: {:.2f}".format(best_epoch))
 
 if __name__ == '__main__':
     result_recorder = ResultRecorder(args)

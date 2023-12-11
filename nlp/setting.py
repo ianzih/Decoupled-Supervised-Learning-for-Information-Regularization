@@ -39,8 +39,11 @@ def set_loader(dataset, args):
             else:
                 label.append(0)
         vocab = create_vocab(corpus)
+        
+        random_seed = 42 if args.side_dim != None else None
         clean_train, clean_test, train_label, test_label = train_test_split(
-            text, label, test_size=0.2)
+            text, label, test_size=0.2, random_state = random_seed)
+        
         clean_train, train_label = data_cleansing(clean_train, train_label, doRemove=True)
         clean_test, test_label = data_cleansing(clean_test, test_label, doRemove=True)
     
@@ -61,6 +64,8 @@ def set_model(name , args):
         model = LSTM_Research(args)
     elif name == "LSTM_SCPL":
         model = LSTM_SCPL(args)
+    elif name == "LSTM_Research_side":
+        model = LSTM_Research_side(args)
     else:
         raise ValueError("Model not supported: {}".format(name))
     

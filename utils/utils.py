@@ -365,13 +365,17 @@ def GetModelSize(model, train_loader, args):
     
     if args.showmodelsize == True:
         for _, (X, Y) in enumerate(train_loader): 
-            if args.aug_type == "strong" and args.task == "vision":
-                if args.dataset == "cifar10" or args.dataset == "cifar100":
-                    X = torch.cat(X).cuda(non_blocking=True)
-                    Y = torch.cat(Y).cuda(non_blocking=True)
-                else:
-                    X = torch.cat(X).cuda(non_blocking=True)
-                    Y = torch.cat([Y, Y]).cuda(non_blocking=True)
+            if args.task == "vision":
+                if args.aug_type == "strong":
+                    if args.dataset == "cifar10" or args.dataset == "cifar100":
+                        X = torch.cat(X).cuda(non_blocking=True)
+                        Y = torch.cat(Y).cuda(non_blocking=True)
+                    else:
+                        X = torch.cat(X).cuda(non_blocking=True)
+                        Y = torch.cat([Y, Y]).cuda(non_blocking=True)
+            else:
+                X = X.cuda(non_blocking=True)
+                Y = Y.cuda(non_blocking=True)
 
             model.train()
             summary(model, depth = 10, input_data = [X,Y], batch_dim = args.train_bsz, verbose = 1)
