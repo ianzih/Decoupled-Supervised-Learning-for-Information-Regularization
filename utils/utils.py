@@ -69,12 +69,13 @@ class ALComponent(nn.Module):
 class VICRIG(nn.Module):
     def __init__(self, input_channel = 256, shape = 32 , args = None, activation = nn.ReLU()):
         super(VICRIG, self).__init__()
-        self.n_class = args.n_classes
-        self.num_features = int(args.mlp.split("-")[-1])
+        self.n_class = args.n_classes  
         if args.task != "nlp":
             self.projector = Projector(args, int(input_channel * shape * shape), activation)
+            self.num_features = int(args.mlp.split("-")[-1])
         else:
             self.projector = nn.Identity()
+            self.num_features = int(input_channel)
         
     def forward(self, x, label):
         device = "cuda" if torch.cuda.is_available() else "cpu"

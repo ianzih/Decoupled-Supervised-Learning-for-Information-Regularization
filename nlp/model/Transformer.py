@@ -2,11 +2,11 @@ import torch
 import torch.nn as nn
 from utils.utils import *
 from utils.nlp_utils import *
+from .transformer.encoder import TransformerEncoder
 
-
-class LSTM_block(nn.Module):
+class Transformer_block(nn.Module):
     def __init__(self, args):
-        super(LSTM_block, self).__init__()
+        super(Transformer_block, self).__init__()
         self.args = args
         self.vocab_size = args.vocab_size
         self.emb_dim = args.emb_dim
@@ -23,7 +23,7 @@ class LSTM_block(nn.Module):
     def predictlayer(self, in_dim, out_dim, hidden_dim=100, act_fun = nn.Tanh()):
         return nn.Sequential(nn.Linear(in_dim, hidden_dim), act_fun, nn.Linear(hidden_dim, out_dim))
           
-    def _make_layer(self, in_dim, out_dim, word_vec_type = None):
+    def _make_layer(self, in_dim, out_dim, word_vec_type = None, n_head = 6):
         if word_vec_type != None:  
             if word_vec_type == "pretrain":
                 print("[Layer] Use pretrained embedding")
@@ -31,7 +31,7 @@ class LSTM_block(nn.Module):
             else:
                 layers = nn.Embedding(in_dim, out_dim)
         else:
-            layers = nn.LSTM(in_dim, out_dim, bidirectional = True, batch_first = True)
+            layers = TransformerEncoder(d_model = in_dim, d_ff = out_dim, n_heads = n_head)
         return layers
     
     def sidedata(self, x , dim = -1):
@@ -40,6 +40,13 @@ class LSTM_block(nn.Module):
             return torch.split(x, self.side_dim, dim)[0]
         else:
             return torch.split(x, self.side_dim, dim)
+
+    def get_mask(self, x):
+        pad_mask = ~(x == 0)
+        return pad_mask.cuda()
+    
+    def reduction(self, x, mask):
+        return torch.sum(x * mask.unsqueeze(-1), dim=1) / torch.sum(mask, -1, keepdim=True)
     
     def forward(self, x, y):
         if self.training:
@@ -48,56 +55,57 @@ class LSTM_block(nn.Module):
             return self.inference(x, y)
     
 
-class LSTM(LSTM_block):
+class Transformer(Transformer_block):
     def __init__(self, args):
-        super(LSTM, self).__init__(args)
+        super(Transformer, self).__init__(args)
         self.ce = nn.CrossEntropyLoss()
         self.embedding = self._make_layer(in_dim = self.vocab_size, out_dim = self.emb_dim, word_vec_type = args.word_vec_type)
-        self.layer1 = self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim)
-        self.layer2 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
-        self.layer3 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
-        self.layer4 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
-
+        self.layer1 = self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim, n_head = self.n_heads)
+        self.layer2 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim, n_head = self.n_heads)
+        self.layer3 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim, n_head = self.n_heads)
+        self.layer4 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim, n_head = self.n_heads)
+        
         self.fc = self.predictlayer(in_dim = self.h_dim, hidden_dim = self.h_dim, out_dim = self.n_classes, act_fun = nn.Tanh())
         
     def train_step(self, x, y):
-        hidden = None
+        mask = self.get_mask(x)
         # embedding
         emb = self.embedding(x)
-        # LSTM1
-        output, hidden = self.layer1(emb, hidden)
-        # LSTM2
-        output, hidden = self.layer2(output, hidden)
-        # LSTM3
-        output, hidden = self.layer3(output, hidden)
-        # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        # Transformer1
+        output = self.layer1(emb, mask)
+        # Transformer2
+        output = self.layer2(output, mask)
+        # Transformer3
+        output = self.layer3(output, mask)
+        # Transformer4
+        output = self.layer4(output, mask)
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+        output = self.fc(self.reduction(output, mask))
         loss = self.ce(output, y)
+        
         return loss
 
     def inference(self, x, y):
-        hidden = None
+        mask = self.get_mask(x)
         # embedding
         emb = self.embedding(x)
-        # LSTM1
-        output, hidden = self.layer1(emb, hidden)
-        # LSTM2
-        output, hidden = self.layer2(output, hidden)
-        # LSTM3
-        output, hidden = self.layer3(output, hidden)
-        # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        # Transformer1
+        output = self.layer1(emb, mask)
+        # Transformer2
+        output = self.layer2(output, mask)
+        # Transformer3
+        output = self.layer3(output, mask)
+        # Transformer4
+        output = self.layer4(output, mask)
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
-         
+        output = self.fc(self.reduction(output, mask))
+        
         return output
 
 
-class LSTM_SCPL(LSTM_block):
+class Transformer_SCPL(Transformer_block):
     def __init__(self, args):
-        super(LSTM_SCPL, self).__init__(args)
+        super(Transformer_SCPL, self).__init__(args)
         # embedding
         self.embedding = self._make_layer(in_dim = self.vocab_size, out_dim = self.emb_dim, word_vec_type = args.word_vec_type)
         self.loss0 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
@@ -105,13 +113,13 @@ class LSTM_SCPL(LSTM_block):
         self.layer1 = self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim)
         self.loss1 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
         # layer2
-        self.layer2 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        self.layer2 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
         self.loss2 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
         # layer3
-        self.layer3 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        self.layer3 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
         self.loss3 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
-        #layer4
-        self.layer4 = self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim)
+        # layer4
+        self.layer4 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
         self.loss4 =  ContrastiveLoss(0.1, input_channel = self.h_dim, shape = 1, mid_neurons = self.h_dim, out_neurons = self.h_dim, args = args)
         
         self.fc = self.predictlayer(in_dim = self.h_dim, hidden_dim = self.h_dim, out_dim = self.n_classes, act_fun = nn.Tanh())
@@ -119,53 +127,50 @@ class LSTM_SCPL(LSTM_block):
         
     def train_step(self, x, y):
         loss = 0
-        hidden = None
+        mask = self.get_mask(x)
         # embedding
         emb = self.embedding(x)
         loss += self.loss0(emb.mean(1), y)
         emb = emb.detach()
-        # LSTM1
-        output, hidden = self.layer1(emb, hidden)
-        loss += self.loss1((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
-        # LSTM2
-        output, hidden = self.layer2(output.detach(), hidden)
-        loss += self.loss2((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
-        # LSTM3
-        output, hidden = self.layer3(output.detach(), hidden)
-        loss += self.loss3((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
-        # LSTM4
-        output, hidden = self.layer4(output.detach(), hidden)
-        loss += self.loss4((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
+        # Transformer1
+        output = self.layer1(emb, mask)
+        loss += self.loss1(self.reduction(output, mask), y)
+        # Transformer2
+        output = self.layer2(output.detach(), mask)
+        loss += self.loss2(self.reduction(output, mask), y)
+        # Transformer3
+        output = self.layer3(output.detach(), mask)
+        loss += self.loss3(self.reduction(output, mask), y)
+        # Transformer4
+        output = self.layer4(output.detach(), mask)
+        loss += self.loss4(self.reduction(output, mask), y)
         
-        output = self.fc(((hidden[0][0] + hidden[0][1]) / 2).detach())
+        output = output.detach()
+        output = self.fc(self.reduction(output, mask))
         loss += self.ce(output, y)
         return loss
           
     def inference(self, x, y):
-        hidden = None
+        mask = self.get_mask(x)
         # embedding
         emb = self.embedding(x)
-        # LSTM1
-        output, hidden = self.layer1(emb, hidden)
-        # LSTM2
-        output, hidden = self.layer2(output, hidden)
-        # LSTM3
-        output, hidden = self.layer3(output, hidden)
-        # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        # Transformer1
+        output = self.layer1(emb, mask)
+        # Transformer2
+        output = self.layer2(output, mask)
+        # Transformer3
+        output = self.layer3(output, mask)
+        # Transformer4
+        output = self.layer4(output, mask)
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+        output = self.fc(self.reduction(output, mask))
          
         return output
 
 
-class LSTM_Research(LSTM_block):
+class Transformer_Research(Transformer_block):
     def __init__(self, args):
-        super(LSTM_Research,self).__init__(args)
+        super(Transformer_Research,self).__init__(args)
         self.layer = nn.ModuleList()
         self.loss = nn.ModuleList()
         self.classifier = nn.ModuleList()
@@ -187,7 +192,7 @@ class LSTM_Research(LSTM_block):
         hidden = None
         total_loss = 0
         total_classifier_loss = 0
-        if self.side_dim != None and self.modeltype == "LSTM_Research":
+        if self.side_dim != None and self.modeltype == "Transformer_Research":
             x = self.sidedata(x)
         
         emb = self.embedding(x)
@@ -201,7 +206,7 @@ class LSTM_Research(LSTM_block):
             total_loss += loss
             total_classifier_loss += classifier_loss
             
-        if self.modeltype == "LSTM_Research_side":
+        if self.modeltype == "Transformer_Research_side":
             return (total_classifier_loss + total_loss) , output , hidden
         else:
             return (total_classifier_loss + total_loss)
@@ -216,7 +221,7 @@ class LSTM_Research(LSTM_block):
             classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
             classifier_output[i+1].append(classifier_out)
             
-        if self.modeltype == "LSTM_Research_side":
+        if self.modeltype == "Transformer_Research_side":
             return output ,  classifier_output , hidden
         else:
             return output ,  classifier_output
@@ -256,9 +261,9 @@ class LSTM_Research(LSTM_block):
         return classifier_out, output, hidden
     
     
-class LSTM_Research_side(LSTM_Research):
+class Transformer_Research_side(Transformer_Research):
     def __init__(self, args):
-        super(LSTM_Research_side , self).__init__(args)
+        super(Transformer_Research_side , self).__init__(args)
         self.side_dim = args.side_dim
         args.blockwise_total += 1
         
@@ -277,7 +282,7 @@ class LSTM_Research_side(LSTM_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        _ , output , hidden= super(LSTM_Research_side, self).train_step(x, y)
+        _ , output , hidden= super(Transformer_Research_side, self).train_step(x, y)
         
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
@@ -293,7 +298,7 @@ class LSTM_Research_side(LSTM_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        output ,  classifier_output_pre , hidden = super(LSTM_Research_side, self).inference(x, y)
+        output ,  classifier_output_pre , hidden = super(Transformer_Research_side, self).inference(x, y)
         for key, value in classifier_output_pre.items():
             classifier_output[key] = value
         
@@ -318,5 +323,5 @@ class LSTM_Research_side(LSTM_Research):
     
     def freeze_pretrain_model(self):
         # Freeze weights of the pretrain model
-        for param in super(LSTM_Research_side, self).parameters():
+        for param in super(Transformer_Research_side, self).parameters():
             param.requires_grad = False

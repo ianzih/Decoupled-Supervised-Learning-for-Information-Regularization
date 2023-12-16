@@ -23,7 +23,7 @@ def get_arguments():
     parser.add_argument("--n_classes", type = int, default = 2, help = 'Number of Dataset classes)')
     
     # Optim
-    parser.add_argument("--optimal", type = str, default = "LARS", help = 'Optimal Name (LARS, SGD, ADAM)')
+    parser.add_argument("--optimal", type = str, default = "ADAM", help = 'Optimal Name (LARS, SGD, ADAM)')
     parser.add_argument('--epochs', type = int, default = 100, help = 'Number of training epochs')
     parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
@@ -38,15 +38,15 @@ def get_arguments():
          e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
     # nlp config
-    parser.add_argument('--max_len', type=int, help='Maximum length for the sequence of input samples', default="350")
-    parser.add_argument('--h_dim', type=int, help='Dimensions of the hidden layer', default="300")
-    parser.add_argument('--heads', type=int, help='Number of heads in the transformer encoder. \
-                        This option is only available for the transformer model.', default="6")
-    parser.add_argument('--vocab_size', type=int, help='Size of vocabulary dictionary.', default="30000")
-    parser.add_argument('--word_vec_type', type=str, help='Type of word embedding, if dont use word embedding, please set "nor"', default="pretrain")
-    parser.add_argument('--word_vec', type=str, help='store of word embedding', default = "glove")
-    parser.add_argument('--emb_dim', type=int, help='Dimension of word embedding', default="300")
-    parser.add_argument('--noise_rate', type=float, help='Noise rate of labels in training dataset (default is 0 for no noise).', default=0.0)
+    parser.add_argument('--max_len', type=int, default = 350, help='Maximum length for the sequence of input samples')
+    parser.add_argument('--h_dim', type=int, default = 300, help='Dimensions of the hidden layer')
+    parser.add_argument('--heads', type=int, default = 4, help='Number of heads in the transformer encoder. \
+                        This option is only available for the transformer model.')
+    parser.add_argument('--vocab_size', type=int, default = 30000, help='Size of vocabulary dictionary.')
+    parser.add_argument('--word_vec_type', type=str, default = "pretrain", help='Type of word embedding, if dont use word embedding, please set "nor"')
+    parser.add_argument('--word_vec', type=str, default = "glove", help='store of word embedding')
+    parser.add_argument('--emb_dim', type=int, default = 300, help='Dimension of word embedding')
+    parser.add_argument('--noise_rate', type=float, default = 0.0, help='Noise rate of labels in training dataset (default is 0 for no noise).')
     
     # other config
     parser.add_argument('--blockwise_total', type = int, default = 5, help = 'Number of layers of the model.(embedding(1) + LSTM(4)) The minimum is \"2\". \

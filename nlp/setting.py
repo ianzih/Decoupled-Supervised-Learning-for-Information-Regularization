@@ -4,6 +4,7 @@ from torchtext import datasets
 from utils.nlp_utils import *
 from utils.utils import *
 from nlp.model.LSTM import *
+from nlp.model.Transformer import *
 
 import pandas as pd
 
@@ -66,6 +67,10 @@ def set_model(name , args):
         model = LSTM_SCPL(args)
     elif name == "LSTM_Research_side":
         model = LSTM_Research_side(args)
+    elif name == "Transformer":
+        model = Transformer(args)
+    elif name == "Transformer_SCPL":
+        model = Transformer_SCPL(args)
     else:
         raise ValueError("Model not supported: {}".format(name))
     
