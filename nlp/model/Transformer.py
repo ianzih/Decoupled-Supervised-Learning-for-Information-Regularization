@@ -184,17 +184,17 @@ class Transformer_Research(Transformer_block):
                 self.loss.append(Set_Local_Loss(input_channel = self.h_dim, shape = 1, args = args, activation = nn.Tanh()))
                 self.classifier.append(Layer_Classifier(input_channel = self.h_dim, args = args, activation = nn.Tanh()))
             else:
-                self.layer.append(self._make_layer(in_dim = self.h_dim * 2, out_dim = self.h_dim))
+                self.layer.append(self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim))
                 self.loss.append(Set_Local_Loss(input_channel = self.h_dim, shape = 1, args = args, activation = nn.Tanh()))
                 self.classifier.append(Layer_Classifier(input_channel = self.h_dim, args = args, activation = nn.Tanh()))
         
     def train_step(self, x, y):
-        hidden = None
         total_loss = 0
         total_classifier_loss = 0
         if self.side_dim != None and self.modeltype == "Transformer_Research":
             x = self.sidedata(x)
-        
+            
+        mask = self.get_mask(x)
         emb = self.embedding(x)
         loss , _= self.lossemb(emb.mean(1), y)
         emb = emb.detach()
@@ -202,63 +202,59 @@ class Transformer_Research(Transformer_block):
         
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
-            loss , classifier_loss , output , hidden = self._training_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+            loss , classifier_loss , output = self._training_each_layer(output, y, mask, self.layer[i], self.loss[i], self.classifier[i])
             total_loss += loss
             total_classifier_loss += classifier_loss
             
         if self.modeltype == "Transformer_Research_side":
-            return (total_classifier_loss + total_loss) , output , hidden
+            return (total_classifier_loss + total_loss) , output
         else:
             return (total_classifier_loss + total_loss)
     
     def inference(self, x, y):
-        hidden = None
+        mask = self.get_mask(x)
         classifier_output = {i: [] for i in range(1, self.blockwisetotal)}
         
         emb = self.embedding(x)
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
-            classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+            classifier_out, output = self._inference_each_layer(output, y, mask, self.layer[i], self.loss[i], self.classifier[i])
             classifier_output[i+1].append(classifier_out)
             
-        if self.modeltype == "Transformer_Research_side":
-            return output ,  classifier_output , hidden
-        else:
-            return output ,  classifier_output
+        return output ,  classifier_output
          
-    def _training_each_layer(self, x, y, hidden, layer, localloss, classifier, freeze = False):
-        output, hidden = layer(x , hidden)
+    def _training_each_layer(self, x, y, mask, layer, localloss, classifier, freeze = False):
+        output = layer(x , mask)
         if freeze:
             output = output.detach()
-        loss , projector_out= localloss((hidden[0][0] + hidden[0][1]) / 2, y)
+        loss , projector_out = localloss(self.reduction(output, mask), y)
          
         # projector_out = projector_out.detach()
         if freeze:
             projector_out = projector_out.detach()
         else:
             output = output.detach()
-            hidden = (hidden[0].detach() , hidden[1].detach())
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)
         elif self.merge == 'unmerge':
-            classifier_out = classifier((hidden[0][0] + hidden[0][1]) / 2) 
+            classifier_out = classifier(self.reduction(output, mask)) 
         if freeze:
             classifier_out = classifier_out.detach()
         classifier_loss = self.ce(classifier_out , y) * 0.001
             
-        return loss , classifier_loss , output, hidden
+        return loss , classifier_loss , output
     
-    def _inference_each_layer(self, x, y, hidden, layer, localloss, classifier):
-        output, hidden = layer(x , hidden)
-        _ , projector_out= localloss((hidden[0][0] + hidden[0][1]) / 2, y)
+    def _inference_each_layer(self, x, y, mask, layer, localloss, classifier):
+        output = layer(x , mask)
+        _ , projector_out= localloss(self.reduction(output, mask), y)
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)
         elif self.merge == 'unmerge':
-            classifier_out = classifier((hidden[0][0] + hidden[0][1]) / 2) 
+            classifier_out = classifier(self.reduction(output, mask)) 
                   
-        return classifier_out, output, hidden
+        return classifier_out , output
     
     
 class Transformer_Research_side(Transformer_Research):
@@ -279,15 +275,15 @@ class Transformer_Research_side(Transformer_Research):
     def train_step(self, x, y):
         total_loss = 0
         total_classifier_loss = 0
+        mask = self.get_mask(x)
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        _ , output , hidden= super(Transformer_Research_side, self).train_step(x, y)
+        _ , output = super(Transformer_Research_side, self).train_step(x, y)
         
         # Input side data to new layer
-        output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        loss , classifier_loss , output , hidden = self._training_each_layer(x_cat, y, hidden, self.newlayer, self.newloss, self.newclassifier)
+        loss , classifier_loss , output  = self._training_each_layer(x_cat, y, mask, self.newlayer, self.newloss, self.newclassifier)
         total_loss += loss
         total_classifier_loss += classifier_loss
         
@@ -295,17 +291,17 @@ class Transformer_Research_side(Transformer_Research):
     
     def inference(self, x, y):
         classifier_output = {i: [] for i in range(1, self.blockwisetotal + 1)}
+        mask = self.get_mask(x)
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        output ,  classifier_output_pre , hidden = super(Transformer_Research_side, self).inference(x, y)
+        output ,  classifier_output_pre = super(Transformer_Research_side, self).inference(x, y)
         for key, value in classifier_output_pre.items():
             classifier_output[key] = value
         
         # Input side data to new layer
-        output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        classifier_out, output , hidden = self._inference_each_layer(x_cat, y, hidden, self.newlayer, self.newloss, self.newclassifier)
+        classifier_out, output = self._inference_each_layer(x_cat, y, mask, self.newlayer, self.newloss, self.newclassifier)
         classifier_output[self.blockwisetotal].append(classifier_out)
         
         return output ,  classifier_output

@@ -95,7 +95,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
+            if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -110,7 +110,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         base = time.time()
     
     # print info
-    if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
+    if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -146,7 +146,7 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
+            if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -161,7 +161,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model in ["LSTM_Research" , "LSTM_Research_side"]:
+    if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"
