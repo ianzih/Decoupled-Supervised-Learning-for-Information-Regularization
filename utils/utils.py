@@ -21,15 +21,8 @@ class ALComponent(nn.Module):
         cf: creterion of forward function
     """
     def __init__(
-        self,
-        f: nn.Module,
-        g: nn.Module,
-        b: nn.Module,
-        inv: nn.Module,
-        cf: nn.Module,
-        cb: nn.Module,
-        ca: nn.Module
-    )->None:
+        self, f: nn.Module, g: nn.Module, b: nn.Module, 
+        inv: nn.Module, cf: nn.Module, cb: nn.Module, ca: nn.Module)->None:
         super(ALComponent, self).__init__()
         self.f = f
         self.g = g
@@ -48,7 +41,7 @@ class ALComponent(nn.Module):
             t = self.g(y)
             t0 = self.inv(t)
             
-            loss_b = self.cb(s0, t.detach()) # contrastive loss
+            loss_b = self.cb(s0, t.detach()) # local loss
             loss_ae = self.ca(t0, y)
             return s.detach(), t.detach(), loss_f, loss_b, loss_ae
         else:
@@ -65,6 +58,7 @@ class ALComponent(nn.Module):
         s0 = self.b(s)
         t0 = self.inv(s0)
         return t0
+
 
 class VICRIG(nn.Module):
     def __init__(self, input_channel = 256, shape = 32 , args = None, activation = nn.ReLU()):
@@ -149,6 +143,7 @@ class ContrastiveLoss(nn.Module):
 
         return loss
 
+
 class PredSimLoss(nn.Module):
     def __init__(self, temperature = 0.1, input_neurons = 2048, c_in = 256, shape = 32):
         super().__init__()
@@ -189,6 +184,7 @@ class PredSimLoss(nn.Module):
         
         return loss
     
+    
 class Layer_Classifier(nn.Module):
     def __init__(self, input_channel = 2048, args = None, activation = nn.ReLU()):
         super().__init__()
@@ -200,6 +196,7 @@ class Layer_Classifier(nn.Module):
         output = self.classifier(x)
         
         return output
+ 
         
 def Projector(args, input_channel, activation = nn.ReLU()):
     mlp_spec = f"{input_channel}-{args.mlp}"
@@ -214,6 +211,7 @@ def Projector(args, input_channel, activation = nn.ReLU()):
         layers.append(activation)
     layers.append(nn.Linear(f[-2], f[-1]))
     return nn.Sequential(*layers)
+
 
 def Classifier(args, input_channel, final_channels, activation = nn.ReLU()):
     mlp_spec = f"{input_channel}-{args.mlp}"
@@ -235,6 +233,7 @@ def Classifier(args, input_channel, final_channels, activation = nn.ReLU()):
         layers.append(nn.Linear(final_channels, args.n_classes))
     return nn.Sequential(*layers)
 
+
 def to_one_hot(y, n_dims=None):
     y_tensor = y.type(torch.LongTensor).view(-1, 1)
     n_dims = n_dims if n_dims is not None else int(torch.max(y_tensor)) + 1
@@ -242,16 +241,19 @@ def to_one_hot(y, n_dims=None):
     y_one_hot = y_one_hot.view(*y.shape, -1)
     return y_one_hot
 
+
 def similarity_matrix(x , no_similarity_std = False):
     xc = x - x.mean(dim=1).unsqueeze(1)
     xn = xc / (1e-8 + torch.sqrt(torch.sum(xc**2, dim=1))).unsqueeze(1)
     R = xn.matmul(xn.transpose(1, 0)).clamp(-1, 1)
     return R
 
+
 def off_diagonal(x):
     n, m = x.shape
     assert n == m
     return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
 
 def Set_Local_Loss(args, input_channel, shape, activation = nn.ReLU()):
     if args.localloss == 'VICRIG':
@@ -276,6 +278,7 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
     
+    
 def accuracy(output, target):
     with torch.no_grad():
         bsz = target.shape[0]
@@ -293,9 +296,11 @@ def Adjust_Learning_Rate(optimizer, base_lr, end_lr, step, max_steps):
     set_lr(optimizer, lr)
     return lr
 
+
 def set_lr(optimizer, lr):
     for g in optimizer.param_groups:
         g['lr'] = lr
+
 
 # LARS Optimizer
 class LARS(optim.Optimizer):
@@ -357,6 +362,7 @@ class LARS(optim.Optimizer):
     def exclude_bias_and_norm(p):
         return p.ndim == 1
     
+    
 def GetModelSize(model, train_loader, args):
     try:
         from torchinfo import summary
@@ -383,10 +389,12 @@ def GetModelSize(model, train_loader, args):
 
             break
 
+
 def SetGPUDevices(gpu_id):
     os.environ['CUDA_VISIBLE_DEVICES'] = gpu_id
     
     return list(map(str, gpu_id.split(",")))
+
 
 def get_gpu_info(gpu_id):
     gpu_info = torch.cuda.get_device_properties(gpu_id)
@@ -402,6 +410,7 @@ def get_gpu_info(gpu_id):
     
     return gpuinfo
 
+
 def Calculate_GPUs_usage(gpu_ids:list()):
     total_all_m = 0
     reserved_all_m = 0
@@ -414,6 +423,7 @@ def Calculate_GPUs_usage(gpu_ids:list()):
         gpus_info.append(gpu_info)
 
     return {"total_all_m":total_all_m, "reserved_all_m":reserved_all_m, "gpus_info": gpus_info}
+
 
 class ResultRecorder(object):
     def __init__(self, args = None):
