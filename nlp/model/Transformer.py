@@ -103,6 +103,118 @@ class Transformer(Transformer_block):
         return output
 
 
+class Transformer_AL_Component(ALComponent):
+    def __init__(self, conv:nn.Module, input_size: int, shape: int, hidden_size: int, out_features: int, catype = None): 
+        flatten_size = int(input_size * shape * shape)
+        g_function = nn.Tanh() 
+        b_function = nn.Tanh()
+
+        f = conv
+        g = nn.Sequential(nn.Linear(out_features , hidden_size), g_function)
+        b = nn.Sequential(nn.Linear(flatten_size, hidden_size), b_function)
+        inv = nn.Sequential(nn.Linear(hidden_size , out_features), g_function)
+
+        cf = nn.Sequential()
+        cb = nn.MSELoss()
+        ca = nn.MSELoss()
+        super(Transformer_AL_Component, self).__init__(f, g, b, inv, cf, cb, ca, catype)
+    
+    def forward(self, x = None, y = None, label = None, mask = None):
+        if self.training:
+            if self.catype == "emb":
+                s = self.f(x)
+                s1 = s.mean(1)
+            else:
+                s = self.f(x, mask)
+                s1 = self.reduction(s, mask)
+            loss_f = 0
+            s0 = self.b(s1)
+            t = self.g(y)
+            t0 = self.inv(t)
+            
+            loss_b = self.cb(s0, t.detach()) # local loss
+            loss_ae = self.ca(t0, y)
+            return s.detach(), t.detach(), loss_f, loss_b, loss_ae
+        else:
+            if y == None:
+                if self.catype == "emb":
+                    s = self.f(x)
+                else:
+                    s = self.f(x , mask)
+                return s 
+            else:
+                t0 = self.inv(y)
+                return t0
+            
+    def bridge_forward(self, x, mask):
+        s = self.f(x, mask)
+        s1 = self.reduction(s, mask)
+        s0 = self.b(s1)
+        t0 = self.inv(s0)
+        return t0
+    
+    def reduction(self, x, mask):
+        return torch.sum(x * mask.unsqueeze(-1), dim=1) / torch.sum(mask, -1, keepdim=True)
+
+
+class Transformer_AL(Transformer_block):
+    def __init__(self, args):
+        super(Transformer_AL, self).__init__(args)
+        neuron_size = 300
+        self.num_classes = args.n_classes
+        embedding = self._make_layer(in_dim = self.vocab_size, out_dim = self.emb_dim, word_vec_type = args.word_vec_type)
+        self.embedding = Transformer_AL_Component(conv = embedding, input_size = self.h_dim, shape = 1, hidden_size = neuron_size, out_features = self.num_classes, catype = "emb")
+         
+        layer1 = self._make_layer(in_dim = self.emb_dim, out_dim = self.h_dim)
+        self.layer1 = Transformer_AL_Component(conv = layer1, input_size = self.h_dim, shape = 1, hidden_size = neuron_size, out_features = neuron_size)
+
+        layer2 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
+        self.layer2 = Transformer_AL_Component(conv = layer2, input_size = self.h_dim, shape = 1, hidden_size = neuron_size, out_features = neuron_size)
+
+        layer3 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
+        self.layer3 = Transformer_AL_Component(conv = layer3, input_size = self.h_dim, shape = 1, hidden_size = neuron_size, out_features = neuron_size)
+
+        layer4 = self._make_layer(in_dim = self.h_dim, out_dim = self.h_dim)
+        self.layer4 = Transformer_AL_Component(conv = layer4, input_size = self.h_dim, shape = 1, hidden_size = neuron_size, out_features = neuron_size)
+    
+    def train_step(self, x, y):
+        total_loss = 0
+        mask = self.get_mask(x)
+        y_onehot = torch.nn.functional.one_hot(y, self.num_classes).float().to(y.device)
+        _s = x
+        _t = y_onehot
+        
+        _s, _t, loss_f, loss_b, loss_ae = self.embedding(x = _s , y = _t)
+        total_loss += (loss_f + loss_b + loss_ae)
+
+        _s, _t, loss_f, loss_b, loss_ae = self.layer1(_s, _t, y, mask)
+        total_loss += (loss_f + loss_b + loss_ae)
+
+        _s, _t, loss_f, loss_b, loss_ae = self.layer2(_s, _t, y, mask)
+        total_loss += (loss_f + loss_b + loss_ae)
+
+        _s, _t, loss_f, loss_b, loss_ae = self.layer3(_s, _t, y, mask)
+        total_loss += (loss_f + loss_b + loss_ae)
+
+        _s, _t, loss_f, loss_b, loss_ae = self.layer4(_s, _t, y, mask)
+        total_loss += (loss_f + loss_b + loss_ae)
+        return total_loss
+    
+    def inference(self, x, y):
+        mask = self.get_mask(x)
+        _s = x
+        _s = self.embedding(_s)
+        _s = self.layer1(_s, None, mask)
+        _s = self.layer2(_s, None, mask)
+        _s = self.layer3(_s, None, mask)
+        _t0 = self.layer4.bridge_forward(_s, mask)
+        _t0 = self.layer3(x = None, y =_t0)
+        _t0 = self.layer2(x = None, y =_t0)
+        _t0 = self.layer1(x = None, y =_t0)
+        _t0 = self.embedding(x = None, y =_t0)
+        return _t0
+    
+
 class Transformer_SCPL(Transformer_block):
     def __init__(self, args):
         super(Transformer_SCPL, self).__init__(args)

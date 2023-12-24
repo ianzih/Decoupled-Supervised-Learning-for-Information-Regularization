@@ -65,12 +65,16 @@ def set_model(name , args):
         model = LSTM_Research(args)
     elif name == "LSTM_SCPL":
         model = LSTM_SCPL(args)
+    elif name == "LSTM_AL":
+        model = LSTM_AL(args)
     elif name == "LSTM_Research_side":
         model = LSTM_Research_side(args)
     elif name == "Transformer":
         model = Transformer(args)
     elif name == "Transformer_SCPL":
         model = Transformer_SCPL(args)
+    elif name == "Transformer_AL":
+        model = Transformer_AL(args)
     elif name == "Transformer_Research":
         model = Transformer_Research(args)
     elif name == "Transformer_Research_side":

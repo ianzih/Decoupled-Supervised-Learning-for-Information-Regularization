@@ -22,7 +22,7 @@ class ALComponent(nn.Module):
     """
     def __init__(
         self, f: nn.Module, g: nn.Module, b: nn.Module, 
-        inv: nn.Module, cf: nn.Module, cb: nn.Module, ca: nn.Module)->None:
+        inv: nn.Module, cf: nn.Module, cb: nn.Module, ca: nn.Module, catype = None)->None:
         super(ALComponent, self).__init__()
         self.f = f
         self.g = g
@@ -31,11 +31,11 @@ class ALComponent(nn.Module):
         self.cb = cb
         self.ca = ca
         self.cf = cf
+        self.catype = catype
     
-    def forward(self, x=None, y=None, label=None):
+    def forward(self, x = None, y = None, label = None):
         if self.training:
             s = self.f(x)
-            #loss_f = 100 * self.cf(s, label)
             loss_f = 0
             s0 = self.b(s)
             t = self.g(y)
