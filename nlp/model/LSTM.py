@@ -429,3 +429,41 @@ class LSTM_Research_side(LSTM_Research):
         # Freeze weights of the pretrain model
         for param in super(LSTM_Research_side, self).parameters():
             param.requires_grad = False
+            
+            
+class LSTM_Research_Adaptive(LSTM_Research):
+    def __init__(self, args):
+        super(LSTM_Research_Adaptive, self).__init__(args)
+        self.countthreshold = args.patiencethreshold
+        self.costhreshold = args.cosinesimthreshold
+        self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        
+    def inference(self, x, y):
+        self.patiencecount = 0
+        classifier_out_pre = None
+        hidden = None
+        
+        emb = self.embedding(x)
+        output = emb
+        for i in range(0 , self.blockwisetotal - 1):
+            if i == 0 :
+                classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[0], self.loss[0], self.classifier[0])
+                classifier_out_pre = classifier_out
+            else:
+                classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+                self.patiencecount += self.AdaptiveCondition(classifier_out_pre , classifier_out)
+                classifier_out_pre = classifier_out
+                 
+                if i == self.blockwisetotal - 2:
+                    return classifier_out , i
+                elif self.patiencecount >= self.countthreshold:
+                    return classifier_out , i
+    
+    def AdaptiveCondition(self, fisrtlayer , prelayer):
+        fisrtlayer_maxarg = torch.argmax(fisrtlayer)
+        prelayer_maxarg = torch.argmax(prelayer)
+        cossimi = torch.mean(self.cos(fisrtlayer , prelayer))
+        if fisrtlayer_maxarg == prelayer_maxarg and cossimi > self.costhreshold:
+            return  1
+        
+        return 0  

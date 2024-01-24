@@ -47,6 +47,34 @@ def set_loader(dataset, args):
         
         clean_train, train_label = data_cleansing(clean_train, train_label, doRemove=True)
         clean_test, test_label = data_cleansing(clean_test, test_label, doRemove=True)
+        
+    elif dataset == "agnews" or dataset == "DBpedia":
+        if dataset == "agnews":
+            train_data = datasets.AG_NEWS(split='train')
+            test_data = datasets.AG_NEWS(split='test')
+            args.max_len = 350
+            n_classes = 4
+        elif dataset == "DBpedia":
+            train_data = datasets.DBpedia(split='train')
+            test_data = datasets.DBpedia(split='test')
+            args.max_len = 60
+            n_classes = 14
+    
+        train_text = [t for _ , t in train_data]
+        test_text = [t for _ , t in test_data]
+        train_label = [l-1 for l , _ in train_data]
+        test_label = [l-1 for l , _ in test_data]
+        
+        clean_train = [data_preprocessing(t, True) for t in train_text]
+        clean_test = [data_preprocessing(t, True) for t in test_text]
+        
+        clean_train, train_label = data_cleansing(clean_train, train_label, doRemove=True)
+        clean_test, test_label = data_cleansing(clean_test, test_label, doRemove=True)
+        
+        vocab = create_vocab(clean_train)
+    else:
+        raise ValueError("Dataset not supported: {}".format(dataset))
+        
     
     trainset = Textset(clean_train, train_label, vocab, args.max_len)
     testset = Textset(clean_test, test_label, vocab, args.max_len)
@@ -69,6 +97,8 @@ def set_model(name , args):
         model = LSTM_AL(args)
     elif name == "LSTM_Research_side":
         model = LSTM_Research_side(args)
+    elif name == "LSTM_Research_Adaptive":
+        model = LSTM_Research_Adaptive(args)
     elif name == "Transformer":
         model = Transformer(args)
     elif name == "Transformer_SCPL":

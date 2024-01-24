@@ -19,7 +19,7 @@ def get_arguments():
     parser.add_argument("--model_weights_path", type = str, default = None, help = 'model weights path')
     
     # Dataset 
-    parser.add_argument("--dataset", type = str, default = "IMDB", help = 'Dataset (IMDB, ag_news)')
+    parser.add_argument("--dataset", type = str, default = "IMDB", help = 'Dataset (IMDB, agnews, DBpedia)')
     parser.add_argument("--n_classes", type = int, default = 2, help = 'Number of Dataset classes)')
     
     # Optim
@@ -155,7 +155,7 @@ def test(test_loader, model, epoch):
             else:
                 output = model(X, Y)
                 acc = accuracy(output, Y)
-                accs.update(acc.item(), bsz) 
+                accs.update(acc.item(), bsz)
 
             batch_time.update(time.time()-base)
             base = time.time()

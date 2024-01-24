@@ -17,12 +17,12 @@ def get_arguments():
 
     # Model 
     parser.add_argument("--task", type = str, default = "vision", help = 'task')
-    parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [CNN, CNN_AL, CNN_SCPL, CNN_PredSim, \
-        VGG, VGG_AL, VGG_SCPL, VGG_PredSim, VGG_Research, resnet, resnet_AL, resnet_SCPL, resnet_PredSim, VGG_Research_Dynamic]')
+    parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [VGG, VGG_AL, VGG_SCPL \
+        , VGG_Research, resnet18, resnet18_AL, resnet18_SCPL,  resnet18_Research, VGG_Research_Adaptive]')
     
     # Dataset 
     parser.add_argument("--dataset", type = str, default = "cifar100", help = 'Dataset (cifar10, cifar100, tinyImageNet)')
-    parser.add_argument("--aug_type", type = str, default = "strong", help = 'Dataset augmentation type(strong or basic)')
+    parser.add_argument("--aug_type", type = str, default = "basic", help = 'Dataset augmentation type(SCPL or basic)')
     parser.add_argument("--n_classes", type = int, default = 100, help = 'Number of Dataset classes)')
     
     # Optim
@@ -66,7 +66,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
 
     base = time.time()
     for step, (X, Y) in enumerate(train_loader):
-        if aug_type == "strong":
+        if aug_type == "SCPL":
             if dataset == "cifar10" or dataset == "cifar100":
                 X = torch.cat(X)
                 Y = torch.cat(Y)
@@ -205,6 +205,8 @@ def main(time, result_recorder):
         if test_acc > best_acc:
             best_acc = test_acc
             best_epoch = epoch
+            bestmodel = model
+            bestoptimizer = optimizer
             best_acc_layer = np.argmax(test_classifier_acc)
         result_recorder.epochresult(time, epoch, lr, train_acc, train_classifier_acc, loss, train_time, test_acc, test_classifier_acc, test_time)
         
@@ -213,14 +215,14 @@ def main(time, result_recorder):
     result_recorder.save(args.jsonfilepath)
         
     # Save Checkpoints    
-    state = { "configs": args, "model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch}
-    if not os.path.exists("./save_models/"):
-        os.makedirs("./save_models/")
-    save_files = os.path.join("./save_models/", "ckpt_last_{0}.pth".format(i))
+    state = { "configs": args, "model": bestmodel.state_dict(), "optimizer": bestoptimizer.state_dict(), "epoch": best_epoch}
+    if not os.path.exists("./save_nlp_models/"):
+        os.makedirs("./save_nlp_models/")
+    save_files = os.path.join("./save_nlp_models/", "ckpt_last_{0}.pth".format(i))
     torch.save(state, save_files)
     
     del state
-    print("Best accuracy: {:.2f}".format(best_acc))
+    print("Best accuracy: {:.2f}".format(best_acc), "Best epoch: {:.2f}".format(best_epoch))
 
 if __name__ == '__main__':
     result_recorder = ResultRecorder(args)

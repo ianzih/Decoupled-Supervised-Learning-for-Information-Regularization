@@ -57,7 +57,6 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
     if dataset == "tinyImageNet":
         normalize = transforms.Normalize([0.4802, 0.4481, 0.3975], [0.2770, 0.2691, 0.2821])
 
-        
         weak_transform = transforms.Compose([
         transforms.Resize(32),
         transforms.RandomCrop(32, padding=4),
@@ -85,14 +84,13 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
         ])
 
     if augmentation_type == "basic":
-        source_transform = weak_transform
+        source_transform = strong_transform
         target_transform = None
-    elif augmentation_type == "strong":
+    elif augmentation_type == "SCPL":
         source_transform = TwoCropTransform(weak_transform, strong_transform)
         target_transform = TwoCropTransform(None)
     else:
         raise ValueError("Augmentation type not supported: {}".format(augmentation_type))
-
 
     if dataset == "cifar10":
         train_set = datasets.CIFAR10(root='./cifar10', transform=source_transform, target_transform = target_transform,  download=True)
@@ -107,7 +105,6 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=train_bsz, shuffle=True, pin_memory=True, num_workers=4)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=test_bsz, shuffle=False, pin_memory=True)
     
-
     return train_loader, test_loader, n_classes
 
 def set_model(name , args):
