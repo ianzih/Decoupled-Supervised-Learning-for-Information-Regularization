@@ -21,7 +21,7 @@ class LSTM_block(nn.Module):
         self.model_weights_path = args.model_weights_path
         
     def predictlayer(self, in_dim, out_dim, hidden_dim=100, act_fun = nn.Tanh()):
-        return nn.Sequential(nn.Linear(in_dim, hidden_dim), act_fun, nn.Linear(hidden_dim, out_dim))
+        return nn.Sequential(nn.Identity(), act_fun, nn.Linear(in_dim, out_dim))
           
     def _make_layer(self, in_dim, out_dim, word_vec_type = None):
         if word_vec_type != None:  
