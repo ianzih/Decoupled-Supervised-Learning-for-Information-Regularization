@@ -45,7 +45,7 @@ class VGG(VGG_block):
         # self.loss =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = 2)
         # self.loss =  VICRIG(c_in = 512, shape = 2, n_class = self.num_class)
 
-        self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_class))
+        self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.ReLU(), nn.Linear(2048, self.num_class))
         
     def forward(self, x, y):
         out = self.layer1(x)
@@ -142,18 +142,18 @@ class VGG_SCPL(VGG_block):
         layer_cfg = {0:[128, 128, 128, 256, "M"], 1:[256, 512, "M"], 2:[512, 512, "M"], 3:[512, "M"]}
 
         self.layer1 = self._make_layer(layer_cfg[0])
-        self.loss1 =  ContrastiveLoss(0.1, input_channel = 256, shape = self._shape_div_2())
+        self.loss1 =  ContrastiveLoss(0.1, input_channel = 256, shape = self._shape_div_2(), args = args)
         
         self.layer2 = self._make_layer(layer_cfg[1])
-        self.loss2 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2())
+        self.loss2 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2(), args = args)
         
         self.layer3 = self._make_layer(layer_cfg[2])
-        self.loss3 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2())
+        self.loss3 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2(), args = args)
         
         self.layer4 = self._make_layer(layer_cfg[3])
-        self.loss4 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2())
+        self.loss4 =  ContrastiveLoss(0.1, input_channel = 512, shape = self._shape_div_2(), args = args)
         
-        self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
         self.ce = nn.CrossEntropyLoss()
     
     def train_step(self, x, y):
@@ -276,28 +276,25 @@ class VGG_Research_Adaptive(VGG_Research):
         super(VGG_Research_Adaptive, self).__init__(args)
         self.countthreshold = args.patiencethreshold
         self.costhreshold = args.cosinesimthreshold
-        self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        self.cos = nn.CosineSimilarity(dim=1)
         
     def inference(self, x, y):
         self.patiencecount = 0
-        # Layer1
-        classifier_out1, output = self._inference_each_layer(x, y , self.layer1, self.loss1, self.classifier1)
+        classifier_out_pre = None
         
-        # Layer2    
-        classifier_out2, output = self._inference_each_layer(output, y , self.layer2, self.loss2, self.classifier2)
-        self.patiencecount += self.AdaptiveCondition(classifier_out1 , classifier_out2)
-        if self.patiencecount >= self.countthreshold:
-            return classifier_out2
-            
-        # Layer3
-        classifier_out3, output = self._inference_each_layer(output, y , self.layer3, self.loss3, self.classifier3)
-        self.patiencecount += self.AdaptiveCondition(classifier_out2 , classifier_out3)
-        if self.patiencecount >= self.countthreshold:
-            return classifier_out3
-            
-        # Layer4
-        classifier_out4, output = self._inference_each_layer(output, y , self.layer4, self.loss4, self.classifier4)
-        return classifier_out4 
+        for i in range(0 , self.blockwisetotal):
+            if i == 0 :
+                classifier_out, output = self._inference_each_layer(x, y, self.layer[0], self.loss[0], self.classifier[0])
+                classifier_out_pre = classifier_out
+            else:
+                classifier_out, output = self._inference_each_layer(output, y, self.layer[i], self.loss[i], self.classifier[i])
+                self.patiencecount += self.AdaptiveCondition(classifier_out_pre , classifier_out)
+                classifier_out_pre = classifier_out
+                 
+                if i == self.blockwisetotal - 1:
+                    return classifier_out
+                elif self.patiencecount >= self.countthreshold:
+                    return classifier_out
     
     def AdaptiveCondition(self, fisrtlayer , prelayer):
         fisrtlayer_maxarg = torch.argmax(fisrtlayer)

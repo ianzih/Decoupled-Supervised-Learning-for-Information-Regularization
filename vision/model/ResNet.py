@@ -110,9 +110,10 @@ class resnet(Resnet_block):
         self.layer3 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[2])
         self._shape_div_2()
         self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
-        # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
-        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion *  self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
+        # self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion *  self.shape * self.shape), 2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
         
     def train_step(self, x , y):
         output = self.conv1(x)
@@ -123,8 +124,8 @@ class resnet(Resnet_block):
         output = self.layer3(output)
         output = self.layer4(output)
         
-        # output = self.avgpool(output)
-        # output = output.view(output.size(0), -1)
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
         
         output = self.fc(output)
         return self.ce(output, y)
@@ -138,8 +139,8 @@ class resnet(Resnet_block):
         output = self.layer3(output)
         output = self.layer4(output)
         
-        # output = self.avgpool(output)
-        # output = output.view(output.size(0), -1)
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
         
         output = self.fc(output)
         return output
@@ -229,16 +230,17 @@ class resnet_SCPL(Resnet_block):
         self.conv1 = conv_layer_bn(self.num_channel, self.dim, nn.ReLU(inplace=True), stride = 1, kernel_size=3)
         # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block = self.block, out_channels = self.dim, blocks = self.layers[0])
-        self.loss1 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self.shape)
+        self.loss1 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self.shape, args = args)
         self.layer2 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[1])
-        self.loss2 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
+        self.loss2 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2(), args = args)
         self.layer3 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[2])
-        self.loss3 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
+        self.loss3 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2(), args = args)
         self.layer4 = self._make_layer(block = self.block, out_channels = self._dim_mul_2(), stride = 2, blocks = self.layers[3])
-        self.loss4 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2())
-        # self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
-        self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion * self.shape * self.shape), 2048), nn.BatchNorm1d(2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
+        self.loss4 =  ContrastiveLoss(0.1, input_channel = self.dim * block.expansion, shape = self._shape_div_2(), args = args)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(self.dim * block.expansion, self.num_classes)
+        # self.fc = nn.Sequential(Flatten(), nn.Linear(int(self.dim * block.expansion * self.shape * self.shape), 2048), nn.ReLU(), nn.Linear(2048, self.num_classes))
 
         
     def train_step(self, x , y):
@@ -263,8 +265,9 @@ class resnet_SCPL(Resnet_block):
         loss += self.loss4(output, y)
         output = output.detach()
         
-        # output = self.avgpool(output)
-        # output = output.view(output.size(0), -1)
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
+        
         output = self.fc(output)
         loss += self.ce(output, y)
         return loss
@@ -278,8 +281,9 @@ class resnet_SCPL(Resnet_block):
         output = self.layer3(output)
         output = self.layer4(output)
         
-        # output = self.avgpool(output)
-        # output = output.view(output.size(0), -1)
+        output = self.avgpool(output)
+        output = output.view(output.size(0), -1)
+        
         output = self.fc(output)
         return output
 
