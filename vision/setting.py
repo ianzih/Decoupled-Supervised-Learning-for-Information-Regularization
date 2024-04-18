@@ -26,6 +26,8 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
         std = (0.2675, 0.2565, 0.2761)
     elif dataset == "tinyImageNet":
         n_classes = 200
+        mean = (0.4802, 0.4481, 0.3975)
+        std = (0.2770, 0.2691, 0.2821)
     else:
         raise ValueError("Dataset not supported: {}".format(dataset))
     
@@ -55,7 +57,7 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
         ])
 
     if dataset == "tinyImageNet":
-        normalize = transforms.Normalize([0.4802, 0.4481, 0.3975], [0.2770, 0.2691, 0.2821])
+        normalize = transforms.Normalize(mean=mean, std=std)
 
         weak_transform = transforms.Compose([
         transforms.Resize(32),
@@ -114,14 +116,14 @@ def set_model(name , args):
         model = VGG_AL(args)
     elif name == "VGG_SCPL":
         model = VGG_SCPL(args)
-    elif name == "VGG_Research":
-        model = VGG_Research(args)
+    elif name == "VGG_DeInfoReg":
+        model = VGG_DeInfoReg(args)
     elif name == "VGG_AL":
         model = VGG_AL(args)
-    elif name == "VGG_Research_Dynamic":
-        model = VGG_Research_Dynamic(args)
-    elif name == "VGG_Research_Adaptive":
-        model = VGG_Research_Adaptive(args)
+    elif name == "VGG_DeInfoReg_Dynamic":
+        model = VGG_DeInfoReg_Dynamic(args)
+    elif name == "VGG_DeInfoReg_Adaptive":
+        model = VGG_DeInfoReg_Adaptive(args)
     elif name == "resnet18":
         model = resnet(args, BasicBlock, [2, 2, 2, 2])
     elif name == "resnet34":
@@ -140,14 +142,14 @@ def set_model(name , args):
         model = resnet_SCPL(args, BasicBlock, [3, 4, 6, 3])
     elif name == "resnet50_SCPL":
         model = resnet_SCPL(args, Bottleneck, [3, 4, 6, 3])
-    elif name == "resnet18_Research":
-        model = resnet_Research(args, BasicBlock, [2, 2, 2, 2])
-    elif name == "resnet34_Research":
-        model = resnet_Research(args, BasicBlock, [3, 4, 6, 3])
-    elif name == "resnet50_Research":
-        model = resnet_Research(args, Bottleneck, [3, 4, 6, 3])
-    elif name == "resnet18_Research_Adaptive":
-        model = resnet_Research_Adaptive(args, BasicBlock, [2, 2, 2, 2])
+    elif name == "resnet18_DeInfoReg":
+        model = resnet_DeInfoReg(args, BasicBlock, [2, 2, 2, 2])
+    elif name == "resnet34_DeInfoReg":
+        model = resnet_DeInfoReg(args, BasicBlock, [3, 4, 6, 3])
+    elif name == "resnet50_DeInfoReg":
+        model = resnet_DeInfoReg(args, Bottleneck, [3, 4, 6, 3])
+    elif name == "resnet18_DeInfoReg_Adaptive":
+        model = resnet_DeInfoReg_Adaptive(args, BasicBlock, [2, 2, 2, 2])
     else:
         raise ValueError("Model not supported: {}".format(name))
     

@@ -52,12 +52,12 @@ def set_loader(dataset, args):
         if dataset == "agnews":
             train_data = datasets.AG_NEWS(split='train')
             test_data = datasets.AG_NEWS(split='test')
-            args.max_len = 350
+            args.max_len = 60
             n_classes = 4
         elif dataset == "DBpedia":
             train_data = datasets.DBpedia(split='train')
             test_data = datasets.DBpedia(split='test')
-            args.max_len = 60
+            args.max_len = 350
             n_classes = 14
     
         train_text = [t for _ , t in train_data]
@@ -89,26 +89,26 @@ def set_loader(dataset, args):
 def set_model(name , args):
     if name == "LSTM":
         model = LSTM(args)
-    elif name == "LSTM_Research":
-        model = LSTM_Research(args)
+    elif name == "LSTM_DeInfoReg":
+        model = LSTM_DeInfoReg(args)
     elif name == "LSTM_SCPL":
         model = LSTM_SCPL(args)
     elif name == "LSTM_AL":
         model = LSTM_AL(args)
-    elif name == "LSTM_Research_side":
-        model = LSTM_Research_side(args)
-    elif name == "LSTM_Research_Adaptive":
-        model = LSTM_Research_Adaptive(args)
+    elif name == "LSTM_DeInfoReg_side":
+        model = LSTM_DeInfoReg_side(args)
+    elif name == "LSTM_DeInfoReg_Adaptive":
+        model = LSTM_DeInfoReg_Adaptive(args)
     elif name == "Transformer":
         model = Transformer(args)
     elif name == "Transformer_SCPL":
         model = Transformer_SCPL(args)
     elif name == "Transformer_AL":
         model = Transformer_AL(args)
-    elif name == "Transformer_Research":
-        model = Transformer_Research(args)
-    elif name == "Transformer_Research_side":
-        model = Transformer_Research_side(args)
+    elif name == "Transformer_DeInfoReg":
+        model = Transformer_DeInfoReg(args)
+    elif name == "Transformer_DeInfoReg_side":
+        model = Transformer_DeInfoReg_side(args)
     else:
         raise ValueError("Model not supported: {}".format(name))
     

@@ -17,8 +17,8 @@ def get_arguments():
 
     # Model 
     parser.add_argument("--task", type = str, default = "vision", help = 'task')
-    parser.add_argument("--model", type = str, default = "VGG_Research", help = 'Model Name [VGG, VGG_AL, VGG_SCPL \
-        , VGG_Research, resnet18, resnet18_AL, resnet18_SCPL,  resnet18_Research, VGG_Research_Adaptive]')
+    parser.add_argument("--model", type = str, default = "VGG_DeInfoReg", help = 'Model Name [VGG, VGG_AL, VGG_SCPL \
+        , VGG_DeInfoReg, resnet18, resnet18_AL, resnet18_SCPL,  resnet18_DeInfoReg, VGG_DeInfoReg_Adaptive]')
     
     # Dataset 
     parser.add_argument("--dataset", type = str, default = "cifar100", help = 'Dataset (cifar10, cifar100, tinyImageNet)')
@@ -36,7 +36,7 @@ def get_arguments():
     parser.add_argument('--wd', type = float, default = 1e-4, help = 'Optim weight_decay')
     
     # Loss & GPU info.
-    parser.add_argument("--localloss", type = str, default = "VICRIG", help = 'Defined local loss in each layer')
+    parser.add_argument("--localloss", type = str, default = "DeInfoReg", help = 'Defined local loss in each layer')
     parser.add_argument('--gpus', type=str, default="0", help=' ID of the GPU device. If you want to use multiple GPUs, you can separate their IDs with commas, \
          e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
@@ -97,7 +97,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+            if args.model in ["VGG_DeInfoReg", "VGG_DeInfoReg_Dynamic", "resnet18_DeInfoReg", "resnet34_DeInfoReg", "resnet50_DeInfoReg"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -112,7 +112,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         base = time.time()
     
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+    if args.model in ["VGG_DeInfoReg", "VGG_DeInfoReg_Dynamic", "resnet18_DeInfoReg", "resnet34_DeInfoReg", "resnet50_DeInfoReg"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -149,7 +149,7 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+            if args.model in ["VGG_DeInfoReg", "VGG_DeInfoReg_Dynamic", "resnet18_DeInfoReg", "resnet34_DeInfoReg", "resnet50_DeInfoReg"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
@@ -164,7 +164,7 @@ def test(test_loader, model, epoch):
             base = time.time()
 
     # print info
-    if args.model in ["VGG_Research", "VGG_Research_Dynamic", "resnet18_Research", "resnet34_Research", "resnet50_Research"]:
+    if args.model in ["VGG_DeInfoReg", "VGG_DeInfoReg_Dynamic", "resnet18_DeInfoReg", "resnet34_DeInfoReg", "resnet50_DeInfoReg"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"

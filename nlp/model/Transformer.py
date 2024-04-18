@@ -280,9 +280,9 @@ class Transformer_SCPL(Transformer_block):
         return output
 
 
-class Transformer_Research(Transformer_block):
+class Transformer_DeInfoReg(Transformer_block):
     def __init__(self, args):
-        super(Transformer_Research,self).__init__(args)
+        super(Transformer_DeInfoReg,self).__init__(args)
         self.layer = nn.ModuleList()
         self.loss = nn.ModuleList()
         self.classifier = nn.ModuleList()
@@ -303,7 +303,7 @@ class Transformer_Research(Transformer_block):
     def train_step(self, x, y):
         total_loss = 0
         total_classifier_loss = 0
-        if self.side_dim != None and self.modeltype == "Transformer_Research":
+        if self.side_dim != None and self.modeltype == "Transformer_DeInfoReg":
             x = self.sidedata(x)
             
         mask = self.get_mask(x)
@@ -318,7 +318,7 @@ class Transformer_Research(Transformer_block):
             total_loss += loss
             total_classifier_loss += classifier_loss
             
-        if self.modeltype == "Transformer_Research_side":
+        if self.modeltype == "Transformer_DeInfoReg_side":
             return (total_classifier_loss + total_loss) , output
         else:
             return (total_classifier_loss + total_loss)
@@ -369,9 +369,9 @@ class Transformer_Research(Transformer_block):
         return classifier_out , output
     
     
-class Transformer_Research_side(Transformer_Research):
+class Transformer_DeInfoReg_side(Transformer_DeInfoReg):
     def __init__(self, args):
-        super(Transformer_Research_side , self).__init__(args)
+        super(Transformer_DeInfoReg_side , self).__init__(args)
         self.side_dim = args.side_dim
         args.blockwise_total += 1
         
@@ -391,7 +391,7 @@ class Transformer_Research_side(Transformer_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        _ , output = super(Transformer_Research_side, self).train_step(x, y)
+        _ , output = super(Transformer_DeInfoReg_side, self).train_step(x, y)
         
         # Input side data to new layer
         x_cat = torch.cat((output, emb_side), dim = 1)
@@ -407,7 +407,7 @@ class Transformer_Research_side(Transformer_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        output ,  classifier_output_pre = super(Transformer_Research_side, self).inference(x, y)
+        output ,  classifier_output_pre = super(Transformer_DeInfoReg_side, self).inference(x, y)
         for key, value in classifier_output_pre.items():
             classifier_output[key] = value
         
@@ -431,5 +431,5 @@ class Transformer_Research_side(Transformer_Research):
     
     def freeze_pretrain_model(self):
         # Freeze weights of the pretrain model
-        for param in super(Transformer_Research_side, self).parameters():
+        for param in super(Transformer_DeInfoReg_side, self).parameters():
             param.requires_grad = False

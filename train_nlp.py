@@ -15,7 +15,7 @@ def get_arguments():
 
     # Model 
     parser.add_argument("--task", type = str, default = "nlp", help = 'task')
-    parser.add_argument("--model", type = str, default = "nlp_Research", help = 'Model Name []')
+    parser.add_argument("--model", type = str, default = "nlp_DeInfoReg", help = 'Model Name []')
     parser.add_argument("--model_weights_path", type = str, default = None, help = 'model weights path')
     
     # Dataset 
@@ -33,7 +33,7 @@ def get_arguments():
     parser.add_argument('--wd', type = float, default = 1e-4, help = 'Optim weight_decay')
     
     # Loss & GPU info.
-    parser.add_argument("--localloss", type = str, default = "VICRIG", help = 'Defined local loss in each layer')
+    parser.add_argument("--localloss", type = str, default = "DeInfoReg", help = 'Defined local loss in each layer')
     parser.add_argument('--gpus', type=str, default="0", help=' ID of the GPU device. If you want to use multiple GPUs, you can separate their IDs with commas, \
          e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
@@ -95,14 +95,14 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         
         model.eval()
         with torch.no_grad():
-            if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
+            if args.model in ["LSTM_DeInfoReg" , "LSTM_DeInfoReg_side" , "Transformer_DeInfoReg" , "Transformer_DeInfoReg_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
                     acc = accuracy(val, Y)
                     classifier_acc[num].update(acc.item(), bsz)
             else:
-                output = model(X, Y)
+                output, t = model(X, Y)
                 acc = accuracy(output, Y)
                 accs.update(acc.item(), bsz)
 
@@ -110,7 +110,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
         base = time.time()
     
     # print info
-    if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
+    if args.model in ["LSTM_DeInfoReg" , "LSTM_DeInfoReg_side" , "Transformer_DeInfoReg" , "Transformer_DeInfoReg_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "DT {2:.3f}\t"
@@ -132,6 +132,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
 
 
 def test(test_loader, model, epoch):
+    ttime = {i: 0 for i in range(0, args.blockwise_total - 1)}
     model.eval()
 
     batch_time = AverageMeter()
@@ -146,22 +147,23 @@ def test(test_loader, model, epoch):
                 Y = Y.cuda(non_blocking=True)
             bsz = Y.shape[0]
 
-            if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
+            if args.model in ["LSTM_DeInfoReg" , "LSTM_DeInfoReg_side" , "Transformer_DeInfoReg" , "Transformer_DeInfoReg_side"]:
                 output , classifier_output = model(X, Y)
                 classifier_output_list = [num for val in classifier_output.values() for num in val]
                 for num , val in enumerate(classifier_output_list):
                     acc = accuracy(val, Y)
                     classifier_acc[num].update(acc.item(), bsz)
             else:
-                output = model(X, Y)
+                output, t = model(X, Y)
                 acc = accuracy(output, Y)
                 accs.update(acc.item(), bsz)
+                ttime[int(t)] += 1 
 
             batch_time.update(time.time()-base)
             base = time.time()
-
+    print(ttime)
     # print info
-    if args.model in ["LSTM_Research" , "LSTM_Research_side" , "Transformer_Research" , "Transformer_Research_side"]:
+    if args.model in ["LSTM_DeInfoReg" , "LSTM_DeInfoReg_side" , "Transformer_DeInfoReg" , "Transformer_DeInfoReg_side"]:
         print("Epoch: {0}\t"
             "Time {1:.3f}\t"
             "Acc {2:.3f}\t"

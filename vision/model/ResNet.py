@@ -287,9 +287,9 @@ class resnet_SCPL(Resnet_block):
         output = self.fc(output)
         return output
 
-class resnet_Research(Resnet_block):
+class resnet_DeInfoReg(Resnet_block):
     def __init__(self, args, block, layers):
-        super(resnet_Research, self).__init__(args)
+        super(resnet_DeInfoReg, self).__init__(args)
         self.num_classes = args.n_classes
         self.block = block
         self.expansion = block.expansion
@@ -370,9 +370,9 @@ class resnet_Research(Resnet_block):
                   
         return classifier_out, output
 
-class resnet_Research_Adaptive(resnet_Research):
+class resnet_DeInfoReg_Adaptive(resnet_DeInfoReg):
     def __init__(self, args, block, layers):
-        super(resnet_Research_Adaptive, self).__init__(args, block, layers)
+        super(resnet_DeInfoReg_Adaptive, self).__init__(args, block, layers)
         self.countthreshold = args.patiencethreshold
         self.costhreshold = args.cosinesimthreshold
         self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)

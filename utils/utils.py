@@ -60,9 +60,9 @@ class ALComponent(nn.Module):
         return t0
 
 
-class VICRIG(nn.Module):
+class DeInfoReg(nn.Module):
     def __init__(self, input_channel = 256, shape = 32 , args = None, activation = nn.ReLU()):
-        super(VICRIG, self).__init__()
+        super(DeInfoReg, self).__init__()
         self.n_class = args.n_classes  
         if args.task != "nlp":
             self.projector = Projector(args, int(input_channel * shape * shape), activation)
@@ -82,7 +82,7 @@ class VICRIG(nn.Module):
             
             # covar
             x_mean = nor_x - nor_x.mean(dim=0)
-            cov_x = (x_mean.T @ x_mean) / (batch_size - 1)
+            cov_x = (x_mean.T @ x_mean) / (batch_size)
             cov_loss = off_diagonal(cov_x).pow(2).sum().div(self.num_features)
 
             # invar
@@ -94,7 +94,7 @@ class VICRIG(nn.Module):
             # var
             x_mean = nor_x - nor_x.mean(dim=0)
             std_label = torch.sqrt(x_mean.var(dim=0) + 0.0000001) 
-            var_loss = torch.mean(F.relu(1 - std_label)) / (batch_size - 1)
+            var_loss = torch.mean(F.relu(1 - std_label)) / (batch_size)
             
             loss = ( var_loss * 1.0 + invar_loss * 1.0 + cov_loss * 1.0)
 
@@ -256,8 +256,8 @@ def off_diagonal(x):
 
 
 def Set_Local_Loss(args, input_channel, shape, activation = nn.ReLU()):
-    if args.localloss == 'VICRIG':
-        return VICRIG(input_channel, shape, args, activation)
+    if args.localloss == 'DeInfoReg':
+        return DeInfoReg(input_channel, shape, args, activation)
     elif args.localloss == 'contrastive':
         return ContrastiveLoss(input_channel = input_channel, shape = shape, args = args, activation = nn.ReLU())
 

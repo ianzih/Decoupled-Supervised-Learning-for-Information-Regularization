@@ -272,9 +272,9 @@ class LSTM_SCPL(LSTM_block):
         return output
 
 
-class LSTM_Research(LSTM_block):
+class LSTM_DeInfoReg(LSTM_block):
     def __init__(self, args):
-        super(LSTM_Research,self).__init__(args)
+        super(LSTM_DeInfoReg,self).__init__(args)
         self.layer = nn.ModuleList()
         self.loss = nn.ModuleList()
         self.classifier = nn.ModuleList()
@@ -296,7 +296,7 @@ class LSTM_Research(LSTM_block):
         hidden = None
         total_loss = 0
         total_classifier_loss = 0
-        if self.side_dim != None and self.modeltype == "LSTM_Research":
+        if self.side_dim != None and self.modeltype == "LSTM_DeInfoReg":
             x = self.sidedata(x)
         
         emb = self.embedding(x)
@@ -310,7 +310,7 @@ class LSTM_Research(LSTM_block):
             total_loss += loss
             total_classifier_loss += classifier_loss
             
-        if self.modeltype == "LSTM_Research_side":
+        if self.modeltype == "LSTM_DeInfoReg_side":
             return (total_classifier_loss + total_loss) , output , hidden
         else:
             return (total_classifier_loss + total_loss)
@@ -325,7 +325,7 @@ class LSTM_Research(LSTM_block):
             classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
             classifier_output[i+1].append(classifier_out)
             
-        if self.modeltype == "LSTM_Research_side":
+        if self.modeltype == "LSTM_DeInfoReg_side":
             return output ,  classifier_output , hidden
         else:
             return output ,  classifier_output
@@ -365,9 +365,9 @@ class LSTM_Research(LSTM_block):
         return classifier_out, output, hidden
     
     
-class LSTM_Research_side(LSTM_Research):
+class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
     def __init__(self, args):
-        super(LSTM_Research_side , self).__init__(args)
+        super(LSTM_DeInfoReg_side , self).__init__(args)
         self.side_dim = args.side_dim
         args.blockwise_total += 1
         
@@ -386,7 +386,7 @@ class LSTM_Research_side(LSTM_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        _ , output , hidden= super(LSTM_Research_side, self).train_step(x, y)
+        _ , output , hidden= super(LSTM_DeInfoReg_side, self).train_step(x, y)
         
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
@@ -402,7 +402,7 @@ class LSTM_Research_side(LSTM_Research):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        output ,  classifier_output_pre , hidden = super(LSTM_Research_side, self).inference(x, y)
+        output ,  classifier_output_pre , hidden = super(LSTM_DeInfoReg_side, self).inference(x, y)
         for key, value in classifier_output_pre.items():
             classifier_output[key] = value
         
@@ -427,13 +427,13 @@ class LSTM_Research_side(LSTM_Research):
     
     def freeze_pretrain_model(self):
         # Freeze weights of the pretrain model
-        for param in super(LSTM_Research_side, self).parameters():
+        for param in super(LSTM_DeInfoReg_side, self).parameters():
             param.requires_grad = False
             
             
-class LSTM_Research_Adaptive(LSTM_Research):
+class LSTM_DeInfoReg_Adaptive(LSTM_DeInfoReg):
     def __init__(self, args):
-        super(LSTM_Research_Adaptive, self).__init__(args)
+        super(LSTM_DeInfoReg_Adaptive, self).__init__(args)
         self.countthreshold = args.patiencethreshold
         self.costhreshold = args.cosinesimthreshold
         self.cos = nn.CosineSimilarity(dim=1, eps=1e-6)

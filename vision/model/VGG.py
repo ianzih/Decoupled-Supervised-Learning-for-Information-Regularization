@@ -43,7 +43,7 @@ class VGG(VGG_block):
         self.layer4 = self._make_layer([512, 'M'])
 
         # self.loss =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = 2)
-        # self.loss =  VICRIG(c_in = 512, shape = 2, n_class = self.num_class)
+        # self.loss =  DeInfoReg(c_in = 512, shape = 2, n_class = self.num_class)
 
         self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.ReLU(), nn.Linear(2048, self.num_class))
         
@@ -193,9 +193,9 @@ class VGG_SCPL(VGG_block):
         return output
         
 
-class VGG_Research(VGG_block):
+class VGG_DeInfoReg(VGG_block):
     def __init__(self, args):
-        super(VGG_Research, self).__init__(args)
+        super(VGG_DeInfoReg, self).__init__(args)
         self.num_classes = args.n_classes
         self.merge = args.merge
         self.blockwisetotal = args.blockwise_total
@@ -271,9 +271,9 @@ class VGG_Research(VGG_block):
         return classifier_out, output
 
 
-class VGG_Research_Adaptive(VGG_Research):
+class VGG_DeInfoReg_Adaptive(VGG_DeInfoReg):
     def __init__(self, args):
-        super(VGG_Research_Adaptive, self).__init__(args)
+        super(VGG_DeInfoReg_Adaptive, self).__init__(args)
         self.countthreshold = args.patiencethreshold
         self.costhreshold = args.cosinesimthreshold
         self.cos = nn.CosineSimilarity(dim=1)
@@ -306,9 +306,9 @@ class VGG_Research_Adaptive(VGG_Research):
         return 0    
     
         
-class VGG_Research_Dynamic(VGG_Research):
+class VGG_DeInfoReg_Dynamic(VGG_DeInfoReg):
     def __init__(self, args):
-        super(VGG_Research_Dynamic, self).__init__(args)
+        super(VGG_DeInfoReg_Dynamic, self).__init__(args)
         self.dynamic_trigger_epoch = self.split_trigger_epoch(args.trigger_epoch)
         self.args = args
 
