@@ -70,8 +70,8 @@ def set_loader(dataset, args):
         
         clean_train, train_label = data_cleansing(clean_train, train_label, doRemove=True)
         clean_test, test_label = data_cleansing(clean_test, test_label, doRemove=True)
-        
-        vocab = create_vocab(clean_train)
+        corpus = [tokenize(text) for text in (clean_train + clean_test)]
+        vocab = create_vocab(corpus)
     else:
         raise ValueError("Dataset not supported: {}".format(dataset))
         

@@ -24,11 +24,11 @@ def get_arguments():
     
     # Optim
     parser.add_argument("--optimal", type = str, default = "ADAM", help = 'Optimal Name (LARS, SGD, ADAM)')
-    parser.add_argument('--epochs', type = int, default = 100, help = 'Number of training epochs')
+    parser.add_argument('--epochs', type = int, default = 50, help = 'Number of training epochs')
     parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
-    parser.add_argument('--base_lr', type = float, default = 0.2, help = 'Initial learning rate')
-    parser.add_argument('--end_lr', type = float, default = 0.002, help = 'Learning rate at the end of training')
+    parser.add_argument('--base_lr', type = float, default = 0.001, help = 'Initial learning rate')
+    parser.add_argument('--end_lr', type = float, default = 0.001, help = 'Learning rate at the end of training')
     parser.add_argument('--max_steps', type = int, default = 2000, help = 'Learning step of training')
     parser.add_argument('--wd', type = float, default = 1e-4, help = 'Optim weight_decay')
     
@@ -102,7 +102,7 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
                     acc = accuracy(val, Y)
                     classifier_acc[num].update(acc.item(), bsz)
             else:
-                output, t = model(X, Y)
+                output = model(X, Y)
                 acc = accuracy(output, Y)
                 accs.update(acc.item(), bsz)
 
@@ -132,7 +132,6 @@ def train(train_loader, model, optimizer, global_steps, epoch, dataset):
 
 
 def test(test_loader, model, epoch):
-    ttime = {i: 0 for i in range(0, args.blockwise_total - 1)}
     model.eval()
 
     batch_time = AverageMeter()
@@ -154,14 +153,13 @@ def test(test_loader, model, epoch):
                     acc = accuracy(val, Y)
                     classifier_acc[num].update(acc.item(), bsz)
             else:
-                output, t = model(X, Y)
+                output = model(X, Y)
                 acc = accuracy(output, Y)
                 accs.update(acc.item(), bsz)
-                ttime[int(t)] += 1 
 
             batch_time.update(time.time()-base)
             base = time.time()
-    print(ttime)
+    
     # print info
     if args.model in ["LSTM_DeInfoReg" , "LSTM_DeInfoReg_side" , "Transformer_DeInfoReg" , "Transformer_DeInfoReg_side"]:
         print("Epoch: {0}\t"

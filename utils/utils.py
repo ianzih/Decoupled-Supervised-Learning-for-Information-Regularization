@@ -93,8 +93,8 @@ class DeInfoReg(nn.Module):
             
             # var
             x_mean = nor_x - nor_x.mean(dim=0)
-            std_label = torch.sqrt(x_mean.var(dim=0) + 0.0000001) 
-            var_loss = torch.mean(F.relu(1 - std_label)) / (batch_size)
+            std_x = torch.sqrt(x_mean.var(dim=0) + 0.0000001) 
+            var_loss = torch.mean(F.relu(1 - std_x)) / (batch_size)
             
             loss = ( var_loss * 1.0 + invar_loss * 1.0 + cov_loss * 1.0)
 
@@ -259,7 +259,7 @@ def Set_Local_Loss(args, input_channel, shape, activation = nn.ReLU()):
     if args.localloss == 'DeInfoReg':
         return DeInfoReg(input_channel, shape, args, activation)
     elif args.localloss == 'contrastive':
-        return ContrastiveLoss(input_channel = input_channel, shape = shape, args = args, activation = nn.ReLU())
+        return ContrastiveLoss(input_channel = input_channel, shape = shape, args = args, activation = activation)
 
 
 class AverageMeter(object):
@@ -373,13 +373,16 @@ def GetModelSize(model, train_loader, args):
     if args.showmodelsize == True:
         for _, (X, Y) in enumerate(train_loader): 
             if args.task == "vision":
-                if args.aug_type == "strong":
+                if args.aug_type == "SCPL":
                     if args.dataset == "cifar10" or args.dataset == "cifar100":
                         X = torch.cat(X).cuda(non_blocking=True)
                         Y = torch.cat(Y).cuda(non_blocking=True)
                     else:
                         X = torch.cat(X).cuda(non_blocking=True)
                         Y = torch.cat([Y, Y]).cuda(non_blocking=True)
+                else:
+                    X = X.cuda(non_blocking=True)
+                    Y = Y.cuda(non_blocking=True)
             else:
                 X = X.cuda(non_blocking=True)
                 Y = Y.cuda(non_blocking=True)

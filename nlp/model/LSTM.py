@@ -42,6 +42,7 @@ class LSTM_block(nn.Module):
             return torch.split(x, self.side_dim, dim)
     
     def forward(self, x, y):
+        self.hiddenlist = [None for _ in range(self.blockwisetotal-1)]
         if self.training:
             return self.train_step(x, y)
         else:
@@ -61,36 +62,34 @@ class LSTM(LSTM_block):
         self.fc = self.predictlayer(in_dim = self.h_dim, hidden_dim = self.h_dim, out_dim = self.n_classes, act_fun = nn.Tanh())
         
     def train_step(self, x, y):
-        hidden = None
         # embedding
         emb = self.embedding(x)
         # LSTM1
-        output, hidden = self.layer1(emb, hidden)
+        output, self.hiddenlist[0] = self.layer1(emb, self.hiddenlist[0])
         # LSTM2
-        output, hidden = self.layer2(output, hidden)
+        output, self.hiddenlist[1] = self.layer2(output, self.hiddenlist[1])
         # LSTM3
-        output, hidden = self.layer3(output, hidden)
+        output, self.hiddenlist[2] = self.layer3(output, self.hiddenlist[2])
         # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        output, self.hiddenlist[3] = self.layer4(output, self.hiddenlist[3])
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+        output = self.fc((self.hiddenlist[3][0][0] + self.hiddenlist[3][0][1]) / 2)
         loss = self.ce(output, y)
         return loss
 
     def inference(self, x, y):
-        hidden = None
         # embedding
         emb = self.embedding(x)
         # LSTM1
-        output, hidden = self.layer1(emb, hidden)
+        output, self.hiddenlist[0] = self.layer1(emb, self.hiddenlist[0])
         # LSTM2
-        output, hidden = self.layer2(output, hidden)
+        output, self.hiddenlist[1] = self.layer2(output, self.hiddenlist[1])
         # LSTM3
-        output, hidden = self.layer3(output, hidden)
+        output, self.hiddenlist[2] = self.layer3(output, self.hiddenlist[2])
         # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        output, self.hiddenlist[3] = self.layer4(output, self.hiddenlist[3])
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+        output = self.fc((self.hiddenlist[3][0][0] + self.hiddenlist[3][0][1]) / 2)
          
         return output
 
@@ -174,29 +173,29 @@ class LSTM_AL(LSTM_block):
         _s = x
         _t = y_onehot
         
-        _s, _t, loss_f, loss_b, loss_ae, hidden = self.embedding(x = _s , y = _t)
+        _s, _t, loss_f, loss_b, loss_ae, _ = self.embedding(x = _s , y = _t)
         total_loss += (loss_f + loss_b + loss_ae)
 
-        _s, _t, loss_f, loss_b, loss_ae, hidden = self.layer1(_s, _t, y, hidden)
+        _s, _t, loss_f, loss_b, loss_ae, self.hiddenlist[0] = self.layer1(_s, _t, y, self.hiddenlist[0])
         total_loss += (loss_f + loss_b + loss_ae)
 
-        _s, _t, loss_f, loss_b, loss_ae, hidden = self.layer2(_s, _t, y, hidden)
+        _s, _t, loss_f, loss_b, loss_ae, self.hiddenlist[1] = self.layer2(_s, _t, y, self.hiddenlist[1])
         total_loss += (loss_f + loss_b + loss_ae)
 
-        _s, _t, loss_f, loss_b, loss_ae, hidden = self.layer3(_s, _t, y, hidden)
+        _s, _t, loss_f, loss_b, loss_ae, self.hiddenlist[2] = self.layer3(_s, _t, y, self.hiddenlist[2])
         total_loss += (loss_f + loss_b + loss_ae)
 
-        _s, _t, loss_f, loss_b, loss_ae, hidden = self.layer4(_s, _t, y, hidden)
+        _s, _t, loss_f, loss_b, loss_ae, self.hiddenlist[3] = self.layer4(_s, _t, y, self.hiddenlist[3])
         total_loss += (loss_f + loss_b + loss_ae)
         return total_loss
     
     def inference(self, x, y):
         _s = x
-        _s, hidden = self.embedding(_s)
-        _s, hidden = self.layer1(_s, None, hidden)
-        _s, hidden = self.layer2(_s, None, hidden)
-        _s, hidden = self.layer3(_s, None, hidden)
-        _t0 = self.layer4.bridge_forward(_s, hidden)
+        _s, _ = self.embedding(_s)
+        _s, self.hiddenlist[0] = self.layer1(_s, None, self.hiddenlist[0])
+        _s, self.hiddenlist[1] = self.layer2(_s, None, self.hiddenlist[1])
+        _s, self.hiddenlist[2] = self.layer3(_s, None, self.hiddenlist[2])
+        _t0 = self.layer4.bridge_forward(_s, self.hiddenlist[3])
         _t0 = self.layer3(x = None, y =_t0)
         _t0 = self.layer2(x = None, y =_t0)
         _t0 = self.layer1(x = None, y =_t0)
@@ -228,46 +227,44 @@ class LSTM_SCPL(LSTM_block):
         
     def train_step(self, x, y):
         loss = 0
-        hidden = None
         # embedding
         emb = self.embedding(x)
         loss += self.loss0(emb.mean(1), y)
         emb = emb.detach()
         # LSTM1
-        output, hidden = self.layer1(emb, hidden)
-        loss += self.loss1((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
+        output, self.hiddenlist[0] = self.layer1(emb, self.hiddenlist[0])
+        loss += self.loss1((self.hiddenlist[0][0][0] + self.hiddenlist[0][0][1]) / 2, y)
+        self.hiddenlist[0] = (self.hiddenlist[0][0].detach() , self.hiddenlist[0][1].detach())
         # LSTM2
-        output, hidden = self.layer2(output.detach(), hidden)
-        loss += self.loss2((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
+        output, self.hiddenlist[1] = self.layer2(output.detach(), self.hiddenlist[1])
+        loss += self.loss2((self.hiddenlist[1][0][0] + self.hiddenlist[1][0][1]) / 2, y)
+        self.hiddenlist[1] = (self.hiddenlist[1][0].detach() , self.hiddenlist[1][1].detach())
         # LSTM3
-        output, hidden = self.layer3(output.detach(), hidden)
-        loss += self.loss3((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
+        output, self.hiddenlist[2] = self.layer3(output.detach(), self.hiddenlist[2])
+        loss += self.loss3((self.hiddenlist[2][0][0] + self.hiddenlist[2][0][1]) / 2, y)
+        self.hiddenlist[2] = (self.hiddenlist[2][0].detach() , self.hiddenlist[2][1].detach())
         # LSTM4
-        output, hidden = self.layer4(output.detach(), hidden)
-        loss += self.loss4((hidden[0][0] + hidden[0][1]) / 2, y)
-        hidden = (hidden[0].detach() , hidden[1].detach())
+        output, self.hiddenlist[3] = self.layer4(output.detach(), self.hiddenlist[3])
+        loss += self.loss4((self.hiddenlist[3][0][0] + self.hiddenlist[3][0][1]) / 2, y)
+        self.hiddenlist[3] = (self.hiddenlist[3][0].detach() , self.hiddenlist[3][1].detach())
         
-        output = self.fc(((hidden[0][0] + hidden[0][1]) / 2).detach())
+        output = self.fc(((self.hiddenlist[3][0][0] + self.hiddenlist[3][0][1]) / 2))
         loss += self.ce(output, y)
         return loss
           
     def inference(self, x, y):
-        hidden = None
         # embedding
         emb = self.embedding(x)
         # LSTM1
-        output, hidden = self.layer1(emb, hidden)
+        output, self.hiddenlist[0] = self.layer1(emb, self.hiddenlist[0])
         # LSTM2
-        output, hidden = self.layer2(output, hidden)
+        output, self.hiddenlist[1] = self.layer2(output, self.hiddenlist[1])
         # LSTM3
-        output, hidden = self.layer3(output, hidden)
+        output, self.hiddenlist[2] = self.layer3(output, self.hiddenlist[2])
         # LSTM4
-        output, hidden = self.layer4(output, hidden)
+        output, self.hiddenlist[3] = self.layer4(output, self.hiddenlist[3])
         
-        output = self.fc((hidden[0][0] + hidden[0][1]) / 2)
+        output = self.fc(((self.hiddenlist[3][0][0] + self.hiddenlist[3][0][1]) / 2))
          
         return output
 
@@ -293,7 +290,6 @@ class LSTM_DeInfoReg(LSTM_block):
                 self.classifier.append(Layer_Classifier(input_channel = self.h_dim, args = args, activation = nn.Tanh()))
         
     def train_step(self, x, y):
-        hidden = None
         total_loss = 0
         total_classifier_loss = 0
         if self.side_dim != None and self.modeltype == "LSTM_DeInfoReg":
@@ -306,29 +302,22 @@ class LSTM_DeInfoReg(LSTM_block):
         
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
-            loss , classifier_loss , output , hidden = self._training_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+            loss , classifier_loss , output , self.hiddenlist[i] = self._training_each_layer(output, y, self.hiddenlist[i], self.layer[i], self.loss[i], self.classifier[i])
             total_loss += loss
             total_classifier_loss += classifier_loss
             
-        if self.modeltype == "LSTM_DeInfoReg_side":
-            return (total_classifier_loss + total_loss) , output , hidden
-        else:
-            return (total_classifier_loss + total_loss)
+        return (total_classifier_loss + total_loss)
     
     def inference(self, x, y):
-        hidden = None
         classifier_output = {i: [] for i in range(1, self.blockwisetotal)}
         
         emb = self.embedding(x)
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
-            classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+            classifier_out, output , self.hiddenlist[i] = self._inference_each_layer(output, y, self.hiddenlist[i], self.layer[i], self.loss[i], self.classifier[i])
             classifier_output[i+1].append(classifier_out)
             
-        if self.modeltype == "LSTM_DeInfoReg_side":
-            return output ,  classifier_output , hidden
-        else:
-            return output ,  classifier_output
+        return output ,  classifier_output
          
     def _training_each_layer(self, x, y, hidden, layer, localloss, classifier, freeze = False):
         output, hidden = layer(x , hidden)
@@ -368,6 +357,7 @@ class LSTM_DeInfoReg(LSTM_block):
 class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
     def __init__(self, args):
         super(LSTM_DeInfoReg_side , self).__init__(args)
+        self.newlayerhidden = None
         self.side_dim = args.side_dim
         args.blockwise_total += 1
         
@@ -386,12 +376,12 @@ class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        _ , output , hidden= super(LSTM_DeInfoReg_side, self).train_step(x, y)
+        _ , output = super(LSTM_DeInfoReg_side, self).train_step(x, y)
         
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        loss , classifier_loss , output , hidden = self._training_each_layer(x_cat, y, hidden, self.newlayer, self.newloss, self.newclassifier)
+        loss , classifier_loss , output , self.newlayerhidden = self._training_each_layer(x_cat, y, self.newlayerhidden, self.newlayer, self.newloss, self.newclassifier)
         total_loss += loss
         total_classifier_loss += classifier_loss
         
@@ -402,14 +392,14 @@ class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
         
         x , x_side = self.sidedata(x)
         emb_side = self.embedding(x_side)
-        output ,  classifier_output_pre , hidden = super(LSTM_DeInfoReg_side, self).inference(x, y)
+        output ,  classifier_output_pre = super(LSTM_DeInfoReg_side, self).inference(x, y)
         for key, value in classifier_output_pre.items():
             classifier_output[key] = value
         
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        classifier_out, output , hidden = self._inference_each_layer(x_cat, y, hidden, self.newlayer, self.newloss, self.newclassifier)
+        classifier_out, output , self.newlayerhidden = self._inference_each_layer(x_cat, y, self.newlayerhidden, self.newlayer, self.newloss, self.newclassifier)
         classifier_output[self.blockwisetotal].append(classifier_out)
         
         return output ,  classifier_output
@@ -441,16 +431,15 @@ class LSTM_DeInfoReg_Adaptive(LSTM_DeInfoReg):
     def inference(self, x, y):
         self.patiencecount = 0
         classifier_out_pre = None
-        hidden = None
         
         emb = self.embedding(x)
         output = emb
         for i in range(0 , self.blockwisetotal - 1):
             if i == 0 :
-                classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[0], self.loss[0], self.classifier[0])
+                classifier_out, output , self.hiddenlist[i] = self._inference_each_layer(output, y, self.hiddenlist[i], self.layer[0], self.loss[0], self.classifier[0])
                 classifier_out_pre = classifier_out
             else:
-                classifier_out, output , hidden = self._inference_each_layer(output, y, hidden, self.layer[i], self.loss[i], self.classifier[i])
+                classifier_out, output , self.hiddenlist[i] = self._inference_each_layer(output, y, self.hiddenlist[i], self.layer[i], self.loss[i], self.classifier[i])
                 self.patiencecount += self.AdaptiveCondition(classifier_out_pre , classifier_out)
                 classifier_out_pre = classifier_out
                  

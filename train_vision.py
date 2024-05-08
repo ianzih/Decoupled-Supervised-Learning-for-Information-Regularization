@@ -27,7 +27,7 @@ def get_arguments():
     
     # Optim
     parser.add_argument("--optimal", type = str, default = "LARS", help = 'Optimal Name (LARS, SGD, ADAM)')
-    parser.add_argument('--epochs', type = int, default = 400, help = 'Number of training epochs')
+    parser.add_argument('--epochs', type = int, default = 200, help = 'Number of training epochs')
     parser.add_argument('--train_bsz', type = int, default = 128, help = 'Batch size of training data')
     parser.add_argument('--test_bsz', type = int, default = 1024, help = 'Batch size of test data')
     parser.add_argument('--base_lr', type = float, default = 0.2, help = 'Initial learning rate')
