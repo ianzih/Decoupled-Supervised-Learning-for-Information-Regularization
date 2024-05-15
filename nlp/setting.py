@@ -1,5 +1,6 @@
 from torch.utils.data import DataLoader
 from torchtext import datasets
+from datasets import load_dataset
 
 from utils.nlp_utils import *
 from utils.utils import *
@@ -54,17 +55,23 @@ def set_loader(dataset, args):
             test_data = datasets.AG_NEWS(split='test')
             args.max_len = 60
             n_classes = 4
+            
+            train_text = [t for _ , t in train_data]
+            test_text = [t for _ , t in test_data]
+            train_label = [l-1 for l , _ in train_data]
+            test_label = [l-1 for l , _ in test_data]
+            
         elif dataset == "DBpedia":
-            train_data = datasets.DBpedia(split='train')
-            test_data = datasets.DBpedia(split='test')
+            train_data = load_dataset('dbpedia_14', split='train')
+            test_data = load_dataset('dbpedia_14', split='test')
             args.max_len = 350
             n_classes = 14
+            
+            train_text = [b['content'] for b in train_data]
+            test_text = [b['content'] for b in test_data]
+            train_label = [b['label'] for b in train_data]
+            test_label = [b['label'] for b in test_data]
     
-        train_text = [t for _ , t in train_data]
-        test_text = [t for _ , t in test_data]
-        train_label = [l-1 for l , _ in train_data]
-        test_label = [l-1 for l , _ in test_data]
-        
         clean_train = [data_preprocessing(t, True) for t in train_text]
         clean_test = [data_preprocessing(t, True) for t in test_text]
         
