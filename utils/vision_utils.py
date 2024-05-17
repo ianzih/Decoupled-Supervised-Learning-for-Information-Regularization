@@ -26,7 +26,7 @@ class Flatten(nn.Module):
         return x.view(batch_size, -1)
     
     
-def add_noise_cifar(loader, noise_rate):
+def add_noise_cifar(loader, class_num, noise_rate):
     """ 參考自 https://github.com/PaulAlbert31/LabelNoiseCorrection """
     torch.manual_seed(2)
     np.random.seed(42)
@@ -38,7 +38,7 @@ def add_noise_cifar(loader, noise_rate):
 
     for n, label_i in enumerate(noisy_labels):
         if idx_to_change[n] == 1:
-            set_labels = list(set(range(10)))
+            set_labels = list(set(range(class_num)))
             set_index = np.random.randint(len(set_labels))
             noisy_labels[n] = set_labels[set_index]
 

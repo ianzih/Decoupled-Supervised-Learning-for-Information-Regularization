@@ -1,6 +1,7 @@
 from vision.model.ResNet import *
 from vision.model.VGG import *
 from utils.utils import *
+from utils.vision_utils import *
 from torchvision import transforms, datasets
 
 def set_optim(model, optimal='LARS', args = None):
@@ -15,7 +16,7 @@ def set_optim(model, optimal='LARS', args = None):
     return optimizer
     
 
-def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
+def set_loader(dataset, train_bsz, test_bsz, augmentation_type, args = None):
     if dataset == "cifar10":
         n_classes = 10
         mean = (0.4914, 0.4822, 0.4465)
@@ -106,6 +107,9 @@ def set_loader(dataset, train_bsz, test_bsz, augmentation_type):
 
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=train_bsz, shuffle=True, pin_memory=True, num_workers=4)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=test_bsz, shuffle=False, pin_memory=True)
+    
+    if float(args.noise_rate) != 0:
+        add_noise_cifar(train_loader, n_classes, float(args.noise_rate)) 
     
     return train_loader, test_loader, n_classes
 

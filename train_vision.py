@@ -51,7 +51,7 @@ def get_arguments():
     parser.add_argument('--epoch_now', type = int, default = 1, help = 'Number of epoch now')
     parser.add_argument('--patiencethreshold', type = int, default = 1, help = 'threshold of inference adaptive patience count')
     parser.add_argument('--cosinesimthreshold', type = float, default = 0.8, help = 'threshold of inference adaptive cosine similarity')
-    parser.add_argument('--projectortype', type = str, default = "mlp", help = 'projector head type in loss func.')
+    parser.add_argument('--noise_rate', type=float, default = 0.0, help='Noise rate of labels in training dataset (default is 0 for no noise).')
     
     return parser.parse_args()
 
@@ -188,7 +188,7 @@ def main(time, result_recorder):
     global_steps = 0
     
     GPU_list = SetGPUDevices(args.gpus)
-    train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type)
+    train_loader, test_loader, args.n_classes = set_loader(args.dataset, args.train_bsz, args.test_bsz, args.aug_type, args)
     model = set_model(args.model, args).cuda() if torch.cuda.is_available() else set_model(args.model, args)
     optimizer = set_optim(model= model, optimal= args.optimal, args = args)
     GetModelSize(model, train_loader, args)

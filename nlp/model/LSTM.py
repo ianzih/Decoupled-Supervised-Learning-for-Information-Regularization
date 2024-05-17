@@ -306,7 +306,10 @@ class LSTM_DeInfoReg(LSTM_block):
             total_loss += loss
             total_classifier_loss += classifier_loss
             
-        return (total_classifier_loss + total_loss)
+        if self.modeltype == "LSTM_DeInfoReg_side":
+            return (total_classifier_loss + total_loss) , output
+        else:
+            return (total_classifier_loss + total_loss)
     
     def inference(self, x, y):
         classifier_output = {i: [] for i in range(1, self.blockwisetotal)}
@@ -357,7 +360,6 @@ class LSTM_DeInfoReg(LSTM_block):
 class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
     def __init__(self, args):
         super(LSTM_DeInfoReg_side , self).__init__(args)
-        self.newlayerhidden = None
         self.side_dim = args.side_dim
         args.blockwise_total += 1
         
@@ -381,7 +383,7 @@ class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        loss , classifier_loss , output , self.newlayerhidden = self._training_each_layer(x_cat, y, self.newlayerhidden, self.newlayer, self.newloss, self.newclassifier)
+        loss , classifier_loss , output , self.hiddenlist[-1] = self._training_each_layer(x_cat, y, self.hiddenlist[-1], self.newlayer, self.newloss, self.newclassifier)
         total_loss += loss
         total_classifier_loss += classifier_loss
         
@@ -399,7 +401,7 @@ class LSTM_DeInfoReg_side(LSTM_DeInfoReg):
         # Input side data to new layer
         output = torch.cat((output[:, :, :self.h_dim], output[:, :, self.h_dim:]), dim = 1)
         x_cat = torch.cat((output, emb_side), dim = 1)
-        classifier_out, output , self.newlayerhidden = self._inference_each_layer(x_cat, y, self.newlayerhidden, self.newlayer, self.newloss, self.newclassifier)
+        classifier_out, output , self.hiddenlist[-1] = self._inference_each_layer(x_cat, y, self.hiddenlist[-1], self.newlayer, self.newloss, self.newclassifier)
         classifier_output[self.blockwisetotal].append(classifier_out)
         
         return output ,  classifier_output

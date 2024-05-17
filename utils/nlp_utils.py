@@ -12,6 +12,7 @@ from collections import Counter
 from tqdm import tqdm
 
 import nltk
+nltk.download('punkt')
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 stop_words = set(stopwords.words('english'))
