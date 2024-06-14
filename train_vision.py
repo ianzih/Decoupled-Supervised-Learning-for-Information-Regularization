@@ -85,9 +85,6 @@ def train(train_loader, model, optimizer, global_steps, epoch, aug_type, dataset
         global_steps += 1
 
         loss = model(X, Y)
-
-        if type(loss) == dict:
-            loss = sum(loss["f"]) + sum(loss["b"]) + sum(loss["ae"])
                             
         optimizer.zero_grad()
         loss.backward()

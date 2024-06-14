@@ -341,7 +341,6 @@ class Transformer_DeInfoReg(Transformer_block):
             output = output.detach()
         loss , projector_out = localloss(self.reduction(output, mask), y)
          
-        # projector_out = projector_out.detach()
         if freeze:
             projector_out = projector_out.detach()
         else:

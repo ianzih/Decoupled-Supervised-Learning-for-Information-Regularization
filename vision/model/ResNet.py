@@ -343,7 +343,6 @@ class resnet_DeInfoReg(Resnet_block):
             output = output.detach()
         loss , projector_out= localloss(output, y)
          
-        # projector_out = projector_out.detach()
         if freeze:
             projector_out = projector_out.detach()
         else:
@@ -361,7 +360,7 @@ class resnet_DeInfoReg(Resnet_block):
     
     def _inference_each_layer(self, x, y , layer, localloss, classifier):
         output = layer(x)
-        loss , projector_out= localloss(output, y)
+        _ , projector_out= localloss(output, y)
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)

@@ -42,9 +42,6 @@ class VGG(VGG_block):
         self.layer3 = self._make_layer([512, 512, 'M'])
         self.layer4 = self._make_layer([512, 'M'])
 
-        # self.loss =  ContrastiveLoss(0.1, input_neurons = 2048, c_in = 512, shape = 2)
-        # self.loss =  DeInfoReg(c_in = 512, shape = 2, n_class = self.num_class)
-
         self.fc = nn.Sequential(Flatten(), nn.Linear(2048, 2048), nn.ReLU(), nn.Linear(2048, self.num_class))
         
     def forward(self, x, y):
@@ -52,10 +49,6 @@ class VGG(VGG_block):
         out = self.layer2(out)
         out = self.layer3(out)
         out = self.layer4(out)
-        
-        # if self.training:
-        #     loss += self.loss(out, y)
-        #     out = out.detach()
         
         out = self.fc(out)
         if self.training:
@@ -243,7 +236,6 @@ class VGG_DeInfoReg(VGG_block):
             output = output.detach()
         loss , projector_out= localloss(output, y)
          
-        # projector_out = projector_out.detach()
         if freeze:
             projector_out = projector_out.detach()
         else:
@@ -261,7 +253,7 @@ class VGG_DeInfoReg(VGG_block):
     
     def _inference_each_layer(self, x, y , layer, localloss, classifier):
         output = layer(x)
-        loss , projector_out= localloss(output, y)
+        _ , projector_out= localloss(output, y)
             
         if self.merge == 'merge':
             classifier_out = classifier(projector_out)

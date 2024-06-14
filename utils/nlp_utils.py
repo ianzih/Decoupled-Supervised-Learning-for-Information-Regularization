@@ -96,13 +96,6 @@ def get_word_vector(vocab, emb='glove'):
         raise Exception('emb not implemented')
     
     torch_vocab = [torch.as_tensor(data.get(word, torch.rand(dim))) for word in vocab.keys()]
-    # torch_vocab = []
-    # for word in vocab.keys():
-    #     try:
-    #         torch_vocab.append(torch.tensor(data[word]))
-    #         find += 1
-    #     except:
-    #         torch_vocab.append(torch.rand(300))
 
     return torch.stack(torch_vocab, dim=0)
 

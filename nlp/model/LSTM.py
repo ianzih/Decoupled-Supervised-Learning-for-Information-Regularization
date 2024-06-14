@@ -328,7 +328,6 @@ class LSTM_DeInfoReg(LSTM_block):
             output = output.detach()
         loss , projector_out= localloss((hidden[0][0] + hidden[0][1]) / 2, y)
          
-        # projector_out = projector_out.detach()
         if freeze:
             projector_out = projector_out.detach()
         else:
