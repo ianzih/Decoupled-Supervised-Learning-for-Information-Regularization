@@ -15,7 +15,7 @@ def get_arguments():
 
     # Model 
     parser.add_argument("--task", type = str, default = "nlp", help = 'task')
-    parser.add_argument("--model", type = str, default = "nlp_DeInfoReg", help = 'Model Name []')
+    parser.add_argument("--model", type = str, default = "LSTM_DeInfoReg", help = 'Model Name [LSTM, LSTM_DeInfoReg, LSTM_SCPL, LSTM_AL, LSTM_DeInfoReg_side, LSTM_DeInfoReg_Adaptive, Transformer, Transformer_SCPL, Transformer_AL, Transformer_DeInfoReg, Transformer_DeInfoReg_side]')
     parser.add_argument("--model_weights_path", type = str, default = None, help = 'model weights path')
     
     # Dataset 
@@ -38,7 +38,7 @@ def get_arguments():
          e.g., \"0,1\". For single GPU models, only the first GPU ID will be used.')
     
     # nlp config
-    parser.add_argument('--max_len', type=int, default = 350, help='Maximum length for the sequence of input samples')
+    parser.add_argument('--max_len', type=int, default = 350, help='Maximum length for the sequence of input samples depend on dataset')
     parser.add_argument('--h_dim', type=int, default = 300, help='Dimensions of the hidden layer')
     parser.add_argument('--heads', type=int, default = 4, help='Number of heads in the transformer encoder. \
                         This option is only available for the transformer model.')
