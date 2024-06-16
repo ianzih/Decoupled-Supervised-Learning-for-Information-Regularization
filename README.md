@@ -26,41 +26,41 @@ The detailed content is written in the master's thesis, and the complete source 
 #### Using Docker
 you can simulate the experiment using Docker by Nvidia ,with the following steps:
 ```bash
-$ git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
-$ docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04
-$ cd ./workspace
-$ apt-get update -y && apt-get upgrade -y
-$ apt-get install python3-pip -y
-$ apt-get install wget -y
-$ apt-get install git -y
-$ apt-get install vim -y
-$ apt-get install zip -y
-$ apt-get install openssh-server -y && service ssh start && passwd root
-$ echo "Port 2486" >> /etc/ssh/sshd_config && echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && /etc/init.d/ssh restart
-$ pip install networkx==3.0
-$ pip install torch==2.1.0 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 --index-url https://download.pytorch.org/whl/cu118
-$ pip install -r requirements.txt
+git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
+docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04
+cd ./workspace
+apt-get update -y && apt-get upgrade -y
+apt-get install python3-pip -y
+apt-get install wget -y
+apt-get install git -y
+apt-get install vim -y
+apt-get install zip -y
+apt-get install openssh-server -y && service ssh start && passwd root
+echo "Port 2486" >> /etc/ssh/sshd_config && echo "PermitRootLogin yes" >> /etc/ssh/sshd_config && /etc/init.d/ssh restart
+pip install networkx==3.0
+pip install torch==2.1.0 torchvision==0.15.2+cu118 torchaudio==2.0.2+cu118 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
 ```
 
 If you prefer not to create the environment yourself, you can also use pre-prepared image directly from Docker Hub.
 ```bash
-$ git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
-$ docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace ianzih/deinforeg:24_06
-$ cd ./workspace
+git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
+docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace ianzih/deinforeg:24_06
+cd ./workspace
 ```
 
 ### Dataset
 #### Vision
 * Tiny-imagenet-200:  Download [here](https://drive.google.com/file/d/1M6laujHUg1RJNzrTCnnw4nE6yuijiK1D/view?usp=drive_link). This zip file contains the tinyImageNet dataset processed in the PyTorch ImageFolder format.
   ```bash
-  $ unzip tiny-imagenet-200.zip
+  unzip tiny-imagenet-200.zip
   # Place the unzipped folder (`./tiny-imagenet-200`) in the root.
   ```
 
 #### NLP
 * IMDB: Please download the dataset from [here](https://drive.google.com/file/d/12aEMx9gfwMDZnzGjr3ztIjcCsN4UMW4M/view?usp=sharing).
   ```bash
-  $ mkdir nlpdataset && cd ./nlpdataset
+  mkdir nlpdataset && cd ./nlpdataset
   # Put this file (`IMDB_Dataset.csv`) in the ./nlpdataset.
   ```
 
@@ -68,8 +68,8 @@ $ cd ./workspace
 * Glove
   ```bash
   # cd to the path of your project
-  $ wget https://nlp.stanford.edu/data/glove.6B.zip --no-check-certificate
-  $ unzip glove.6B.zip
+  wget https://nlp.stanford.edu/data/glove.6B.zip --no-check-certificate
+  unzip glove.6B.zip
   # "glove.6B.300d.txt" must be put in the root of the project
   ```
   
@@ -81,11 +81,11 @@ $ cd ./workspace
 #### Example
 ```bash
 # Command Example
-$ python3 train_vision.py --model VGG_DeInfoReg --dataset cifar100 --epochs 200 --optimal LARS
+python3 train_vision.py --model VGG_DeInfoReg --dataset cifar100 --epochs 200 --optimal LARS
 ```
 #### Usage
 ```bash
-$ python3 train_vision.py [Options]
+python3 train_vision.py [Options]
 ```
 #### Options
 | Name | Default | Description |
@@ -112,11 +112,11 @@ $ python3 train_vision.py [Options]
 #### Example
 ```bash
 # Command Example
-$ python3 train_nlp.py --model LSTM_DeInfoReg --dataset IMDB --epochs 50 
+python3 train_nlp.py --model LSTM_DeInfoReg --dataset IMDB --epochs 50 
 ```
 #### Usage
 ```bash
-$ python3 train_nlp.py [Options]
+python3 train_nlp.py [Options]
 ```
 #### Options
 | Name | Default | Description |
@@ -150,7 +150,7 @@ $ python3 train_nlp.py [Options]
 #### Example
 ```bash
 # First step (train 3 LSTM blocks)
-$ python3 train_nlp.py --dataset IMDB --model LSTM_DeInfoReg --train_bsz 512 --epochs 50 --train_time 1 --blockwise_total 4 --side_dim 100 250
+python3 train_nlp.py --dataset IMDB --model LSTM_DeInfoReg --train_bsz 512 --epochs 50 --train_time 1 --blockwise_total 4 --side_dim 100 250
 # Second step (train new layer and add new feature)
-$ python3 train_nlp.py --dataset IMDB --model LSTM_DeInfoReg_side --train_bsz 512 --base_lr 0.0001 --end_lr 0.0001 --epochs 50 --train_time 1 --blockwise_total 4 --side_dim 100 250 --model_weights_path [The file path for the training weights(.pth) in the first step]
+python3 train_nlp.py --dataset IMDB --model LSTM_DeInfoReg_side --train_bsz 512 --base_lr 0.0001 --end_lr 0.0001 --epochs 50 --train_time 1 --blockwise_total 4 --side_dim 100 250 --model_weights_path [The file path for the training weights(.pth) in the first step]
 ```
