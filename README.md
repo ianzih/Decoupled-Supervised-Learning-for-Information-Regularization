@@ -1,4 +1,4 @@
-# Decoupling Supervised Learning for Infomation Regularization
+# Decoupling Supervised Learning for Information Regularization
 
 We propose Decoupled Supervised Learning with Information Regularization (DeInfoReg), that decouples the gradients of different blocks to ensure that the gradients of different blocks do not interfere.
  
@@ -26,7 +26,7 @@ The detailed content is written in the master's thesis, and the complete source 
 #### Using Docker
 you can simulate the experiment using Docker by Nvidia ,with the following steps:
 ```bash
-git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
+git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Information-Regularization.git
 docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04
 cd ./workspace
 apt-get update -y && apt-get upgrade -y
@@ -44,7 +44,7 @@ pip install -r requirements.txt
 
 If you prefer not to create the environment yourself, you can also use pre-prepared image directly from Docker Hub.
 ```bash
-git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Infomation-Regularization.git
+git clone https://github.com/ianzih/Decoupling-Supervised-Learning-for-Information-Regularization.git
 docker run --ipc=host  --gpus all --name DeInfoReg -it -p 0.0.0.0:2486:2486 -v [DeInfoReg file path]:/workspace ianzih/deinforeg:24_06
 cd ./workspace
 ```
