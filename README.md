@@ -1,4 +1,4 @@
-# Decoupling Supervised Learning for Information Regularization
+# Decoupled Supervised Learning for Information Regularization
 
 We propose Decoupled Supervised Learning with Information Regularization (DeInfoReg), that decouples the gradients of different blocks to ensure that the gradients of different blocks do not interfere.
  
