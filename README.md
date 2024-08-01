@@ -6,8 +6,6 @@ DeInfoReg enhances model performance and flexibility by designing new Local Loss
 
 The Local Loss function, employing three regularization methods. Those methods include: ensuring the invariance of the output embedding with true labels, maintaining the variance of output embedding within batch size, and using the covariance to reduce redundancy in the output embedding. This allows the model to better capture data features, enhancing performance.
 
-The detailed content is written in the master's thesis, and the complete source code is published in [this project](https://drive.google.com/file/d/1xAvsAPQd95PuSvTZj1TTqYOnierVvD4E/view?usp=sharing).
-
 ---
 ## Environment
 
